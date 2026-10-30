@@ -12,6 +12,20 @@ const applicationRoutes = require('./routes/applicationRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const { router: securityTestRoutes } = require('./routes/securityTestRoutes');
 
+// Newly integrated statutory lifecycle routes
+const workflowRoutes = require('./routes/workflowRoutes');
+const scrutinyRoutes = require('./routes/scrutinyRoutes');
+const evcRoutes = require('./routes/evcRoutes');
+const sacRoutes = require('./routes/sacRoutes');
+const decisionRoutes = require('./routes/decisionRoutes');
+const undertakingRoutes = require('./routes/undertakingRoutes');
+const complianceRoutes = require('./routes/complianceRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const escalationRoutes = require('./routes/escalationRoutes');
+const institutionRoutes = require('./routes/institutionRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -27,8 +41,10 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ONLINE',
-    system: 'AICTE Centralized Authentication & Access Management Platform',
-    version: '2.4.0',
+    system: 'AICTE Integrated Approval Workflow & Compliance Management System',
+    problemStatementId: '26262',
+    department: 'AICTE Regulation Bureau',
+    version: '3.0.0-GOV',
     timestamp: new Date().toISOString()
   });
 });
@@ -41,6 +57,20 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/security-tests', securityTestRoutes);
+
+// Statutory & Regulatory Modules
+app.use('/api/workflows', workflowRoutes);
+app.use('/api/scrutiny', scrutinyRoutes);
+app.use('/api/evc', evcRoutes);
+app.use('/api/sac', sacRoutes);
+app.use('/api/decisions', decisionRoutes);
+app.use('/api/undertakings', undertakingRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/escalations', escalationRoutes);
+app.use('/api/institutions', institutionRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
@@ -56,9 +86,9 @@ if (require.main === module) {
   initDb();
   app.listen(PORT, () => {
     console.log(`=======================================================`);
-    console.log(`AICTE Centralized Access Management System`);
+    console.log(`AICTE Integrated Approval Workflow & Compliance System`);
+    console.log(`Problem Statement 26262 - Regulation Bureau`);
     console.log(`API Gateway listening on http://localhost:${PORT}`);
-    console.log(`Automated Security Tests available at POST /api/security-tests/run`);
     console.log(`=======================================================`);
   });
 }

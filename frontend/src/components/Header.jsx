@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Shield, Volume2, User, Building, MapPin, LogOut, CheckCircle2, 
   ChevronDown, Key, RefreshCw, FileText, Lock, Award, Users, Activity,
-  Globe, Bell, ExternalLink
+  Globe, Bell, ExternalLink, Menu, Sun, Moon
 } from 'lucide-react';
 import { AicteEmblem, NationalEmblem, G20Logo } from './AicteLogo';
 
@@ -40,7 +40,18 @@ const DEMO_PRESETS = [
   { username: 'auditor', role: 'AUDITOR', label: 'Statutory Auditor (CAG Shri Jain)', tag: 'Strictly Read-Only' },
 ];
 
-export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch, onLogout }) {
+export default function Header({ 
+  user, 
+  currentTab, 
+  setCurrentTab, 
+  onQuickSwitch, 
+  onLogout,
+  onOpenNotifications,
+  unreadCount = 0,
+  onToggleSidebar,
+  isDarkMode,
+  onToggleDarkMode
+}) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [dateTimeStr, setDateTimeStr] = useState('');
@@ -57,6 +68,11 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
     return () => clearInterval(interval);
   }, []);
 
+  const handleFontSize = (size) => {
+    setFontSize(size);
+    document.documentElement.style.fontSize = `${size}%`;
+  };
+
   const handleSelectPreset = async (preset) => {
     setIsSwitching(true);
     setDropdownOpen(false);
@@ -70,10 +86,10 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
   const isAdmin = user && (user.role === 'SUPER_ADMIN' || user.role === 'AICTE_ADMIN');
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs font-sans">
+    <header className="bg-white border-b border-[#DCE3EA] sticky top-0 z-40 shadow-xs font-sans">
       
-      {/* 1. Official Government Top Utility Bar (Black / Dark Gray, as seen in Image 3 & 4) */}
-      <div className="bg-[#1e232a] text-slate-300 text-[11px] py-1 px-4 border-b border-slate-700/60">
+      {/* 1. Official Government Top Utility Bar (Black / Dark Slate, as in official AICTE portal) */}
+      <div className="bg-[#121926] text-slate-300 text-[11px] py-1 px-4 border-b border-slate-700/60">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           
           {/* Left: Date, Time & Screen Reader Access */}
@@ -82,29 +98,56 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
               {dateTimeStr || 'Friday , 10-30-2026 ,2:37 PM'}
             </span>
             <span className="text-slate-600 hidden sm:inline">|</span>
-            <button className="hidden sm:flex items-center space-x-1 text-slate-300 hover:text-white transition">
+            <button className="hidden sm:flex items-center space-x-1 text-slate-300 hover:text-white transition cursor-pointer">
               <Volume2 className="w-3.5 h-3.5" />
               <span>Screen Reader Access</span>
             </button>
           </div>
 
-          {/* Right: Text Size, Hindi Toggle, Social, and Login Status */}
+          {/* Right: Text Size, Hindi Toggle, Notifications, Theme & Role Switcher */}
           <div className="flex items-center space-x-3">
             
             {/* Text Size Controls */}
             <div className="hidden md:flex items-center space-x-1.5 text-slate-300">
               <span className="text-[10px]">Text Size</span>
-              <button onClick={() => setFontSize(90)} className="px-1 hover:text-white font-bold cursor-pointer">A-</button>
-              <button onClick={() => setFontSize(100)} className="px-1 hover:text-white font-bold cursor-pointer">A</button>
-              <button onClick={() => setFontSize(110)} className="px-1 hover:text-white font-bold cursor-pointer">A+</button>
+              <button onClick={() => handleFontSize(90)} className="px-1 hover:text-white font-bold cursor-pointer">A-</button>
+              <button onClick={() => handleFontSize(100)} className="px-1 hover:text-white font-bold cursor-pointer">A</button>
+              <button onClick={() => handleFontSize(110)} className="px-1 hover:text-white font-bold cursor-pointer">A+</button>
             </div>
 
             <span className="text-slate-600 hidden md:inline">|</span>
 
+            {/* Dark / Light Mode Toggle */}
+            <button
+              onClick={onToggleDarkMode}
+              className="text-slate-300 hover:text-white p-1 rounded cursor-pointer"
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Sun className="w-3.5 h-3.5 text-[#F2A900]" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+
+            <span className="text-slate-600">|</span>
+
             {/* Language Toggle Badge */}
-            <div className="bg-[#f59e0b] text-slate-950 px-2 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 shadow-2xs">
+            <div className="bg-[#F2A900] text-slate-950 px-2 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 shadow-2xs">
               <span>अ/A हिन्दी</span>
             </div>
+
+            <span className="text-slate-600">|</span>
+
+            {/* Notification Bell with live badge */}
+            <button
+              onClick={onOpenNotifications}
+              className="relative p-1 text-slate-300 hover:text-white transition cursor-pointer"
+              title="Official Notifications"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
 
             <span className="text-slate-600">|</span>
 
@@ -113,7 +156,7 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
               <button
                 type="button"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="bg-[#f59e0b] hover:bg-amber-400 text-slate-950 font-bold px-2.5 py-0.5 rounded text-[11px] flex items-center space-x-1 transition shadow-xs cursor-pointer"
+                className="bg-[#F2A900] hover:bg-amber-400 text-slate-950 font-bold px-2.5 py-0.5 rounded text-[11px] flex items-center space-x-1 transition shadow-xs cursor-pointer"
                 title="Switch AICTE System Role"
               >
                 <RefreshCw className={`w-3 h-3 text-slate-900 ${isSwitching ? 'animate-spin' : ''}`} />
@@ -141,7 +184,7 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
                         <button
                           key={p.username}
                           onClick={() => handleSelectPreset(p)}
-                          className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-amber-50 transition ${
+                          className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-amber-50 transition cursor-pointer ${
                             isCurrent ? 'bg-amber-100/60 font-semibold text-slate-900' : 'text-slate-700'
                           }`}
                         >
@@ -164,7 +207,7 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
             {user && (
               <button
                 onClick={onLogout}
-                className="text-slate-300 hover:text-red-400 p-0.5 rounded transition"
+                className="text-slate-300 hover:text-red-400 p-0.5 rounded transition cursor-pointer"
                 title="Sign Out"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -180,24 +223,33 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
           
-          {/* Left: AICTE Circular Logo + Bilingual Devanagari & English Names */}
+          {/* Left: Hamburger Menu (Mobile/Compact) + AICTE Emblem + Names */}
           <div className="flex items-center space-x-3.5">
+            {onToggleSidebar && (
+              <button
+                onClick={onToggleSidebar}
+                className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition cursor-pointer"
+                title="Toggle Sidebar"
+              >
+                <Menu className="w-5 h-5 text-[#12345A]" />
+              </button>
+            )}
             <AicteEmblem className="w-14 h-14 md:w-16 md:h-16 shrink-0" />
             <div>
               <h2 className="text-sm md:text-base font-bold text-slate-800 tracking-tight leading-tight">
                 अखिल भारतीय तकनीकी शिक्षा परिषद
               </h2>
-              <h1 className="text-base md:text-xl font-bold text-slate-900 tracking-tight leading-tight font-serif">
+              <h1 className="text-base md:text-xl font-bold text-[#12345A] tracking-tight leading-tight font-serif">
                 All India Council for Technical Education
               </h1>
               <p className="text-[11px] text-slate-500 font-medium">
-                (A Statutory Body of the Government of India)
+                AICTE Digital Governance — Approval & Compliance Management Portal (SIH #26262)
               </p>
             </div>
           </div>
 
-          {/* Right: National Emblem + Ministry of Education + G20 Bharat 2023 Motif */}
-          <div className="hidden lg:flex items-center space-x-6 border-l border-slate-200 pl-6">
+          {/* Right: National Emblem + Ministry of Education + G20 Bharat Motif */}
+          <div className="hidden lg:flex items-center space-x-6 border-l border-[#DCE3EA] pl-6">
             <div className="flex items-center space-x-2">
               <NationalEmblem className="w-6 h-8" />
               <div>
@@ -213,104 +265,21 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
         </div>
       </div>
 
-      {/* 3. Primary Navigation Bar (Navy Blue #132a4e with Bright Gold #f5a623 Active Highlights, matching Image 3 & 4) */}
-      <nav className="bg-[#122749] text-white shadow-md border-t border-blue-900">
-        <div className="max-w-7xl mx-auto px-4 flex items-center overflow-x-auto scrollbar-none">
-          
-          <button
-            onClick={() => setCurrentTab('dashboard')}
-            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-              currentTab === 'dashboard'
-                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
-                : 'text-white hover:bg-[#1a365d] border-transparent'
-            }`}
-          >
-            Dashboard
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('documents')}
-            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-              currentTab === 'documents'
-                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
-                : 'text-white hover:bg-[#1a365d] border-transparent'
-            }`}
-          >
-            Document Repository
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('applications')}
-            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-              currentTab === 'applications'
-                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
-                : 'text-white hover:bg-[#1a365d] border-transparent'
-            }`}
-          >
-            Applications & Processing
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('comments')}
-            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-              currentTab === 'comments'
-                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
-                : 'text-white hover:bg-[#1a365d] border-transparent'
-            }`}
-          >
-            Bureaus / Remarks
-          </button>
-
-          {isAdmin && (
-            <button
-              onClick={() => setCurrentTab('rbac')}
-              className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-                currentTab === 'rbac'
-                  ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
-                  : 'text-white hover:bg-[#1a365d] border-transparent'
-              }`}
-            >
-              RBAC & Policy Studio
-            </button>
-          )}
-
-          <button
-            onClick={() => setCurrentTab('audit')}
-            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-              currentTab === 'audit'
-                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
-                : 'text-white hover:bg-[#1a365d] border-transparent'
-            }`}
-          >
-            Audit Trail (SHA-256)
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('security-tests')}
-            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-              currentTab === 'security-tests'
-                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
-                : 'text-white hover:bg-[#1a365d] border-transparent'
-            }`}
-          >
-            Mandatory Security Tests (9/9)
-          </button>
-
-        </div>
-      </nav>
-
-      {/* 4. Official "LATEST NEWS" Ticker Bar (Image 3 & 4) */}
-      <div className="bg-[#fff9db] border-b border-amber-200 px-4 py-1.5 flex items-center space-x-3 text-xs overflow-hidden">
-        <div className="bg-[#f59e0b] text-slate-950 font-black text-[11px] px-2.5 py-0.5 rounded uppercase tracking-wider shrink-0 shadow-2xs">
-          LATEST NEWS
-        </div>
-        <div className="truncate text-slate-800 font-medium text-[11px]">
-          <span className="text-red-600 font-bold mr-1">*</span>
-          Extension of last date for submission of online applications under AICTE Approval Process 2026-27
-          <span className="ml-3 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">NEW</span>
-          <span className="mx-3 text-slate-400">|</span>
-          <span className="text-red-600 font-bold mr-1">*</span>
-          Mandatory Backend Document Visibility & RBAC Access Matrix Enforced for all Affiliated Technical Institutions
+      {/* 3. Official Government Breaking News / Notification Ticker */}
+      <div className="bg-[#F2A900] text-slate-950 px-4 py-1.5 text-xs font-bold flex items-center border-t border-b border-amber-600/30">
+        <div className="max-w-7xl mx-auto w-full flex items-center">
+          <span className="bg-[#12345A] text-white px-2 py-0.5 rounded text-[10px] tracking-wide mr-3 shrink-0 font-bold">
+            LATEST NOTICES
+          </span>
+          <div className="overflow-hidden whitespace-nowrap text-[11px] font-semibold text-slate-900">
+            <span>
+              ★ AICTE Approval Process Handbook (APH) 2026-27 statutory window open for Technical Institutions.
+              &nbsp;&nbsp;•&nbsp;&nbsp;
+              ★ Scrutiny and EVC Inspections conducted under automated multi-tenant RBAC protocol.
+              &nbsp;&nbsp;•&nbsp;&nbsp;
+              ★ Mandatory submission of 7th CPC Faculty Pay Scale & Anti-Ragging Undertaking.
+            </span>
+          </div>
         </div>
       </div>
 

@@ -33,6 +33,11 @@ export async function apiRequest(endpoint, options = {}) {
     headers
   });
 
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('text/csv')) {
+    return await response.text();
+  }
+
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || data.error || `HTTP error ${response.status}`);
@@ -106,6 +111,177 @@ export const applicationApi = {
     method: 'POST',
     body: JSON.stringify({ decision, remarks })
   })
+};
+
+// Workflow APIs
+export const workflowApi = {
+  getTemplates: () => apiRequest('/workflows/templates'),
+  getHistory: (applicationId) => apiRequest(`/workflows/applications/${applicationId}/history`),
+  transition: (applicationId, nextStage, remarks) => apiRequest(`/workflows/applications/${applicationId}/transition`, {
+    method: 'POST',
+    body: JSON.stringify({ nextStage, remarks })
+  }),
+  hold: (applicationId, reason) => apiRequest(`/workflows/applications/${applicationId}/hold`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  }),
+  resume: (applicationId, remarks) => apiRequest(`/workflows/applications/${applicationId}/resume`, {
+    method: 'POST',
+    body: JSON.stringify({ remarks })
+  })
+};
+
+// Scrutiny & Deficiency APIs
+export const scrutinyApi = {
+  getEvaluation: (applicationId) => apiRequest(`/scrutiny/evaluations/${applicationId}`),
+  saveItem: (applicationId, itemData) => apiRequest(`/scrutiny/evaluations/${applicationId}/item`, {
+    method: 'POST',
+    body: JSON.stringify(itemData)
+  }),
+  completeEvaluation: (applicationId, overall_recommendation, remarks) => apiRequest(`/scrutiny/evaluations/${applicationId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ overall_recommendation, remarks })
+  }),
+  getDeficiencies: (applicationId) => apiRequest(`/scrutiny/deficiencies/${applicationId}`),
+  createDeficiency: (payload) => apiRequest('/scrutiny/deficiencies', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  respondDeficiency: (id, institutionResponse, documentId) => apiRequest(`/scrutiny/deficiencies/${id}/respond`, {
+    method: 'POST',
+    body: JSON.stringify({ institutionResponse, documentId })
+  }),
+  resolveDeficiency: (id, status, resolutionRemarks) => apiRequest(`/scrutiny/deficiencies/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ status, resolutionRemarks })
+  })
+};
+
+// EVC APIs
+export const evcApi = {
+  listInspections: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/evc/inspections${query ? `?${query}` : ''}`);
+  },
+  getByApplication: (applicationId) => apiRequest(`/evc/inspections/${applicationId}`),
+  schedule: (payload) => apiRequest('/evc/inspections/schedule', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  submitFindings: (id, payload) => apiRequest(`/evc/inspections/${id}/submit-findings`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  uploadEvidence: (id, formData) => apiRequest(`/evc/inspections/${id}/evidence`, {
+    method: 'POST',
+    body: formData
+  })
+};
+
+// SAC Hearings APIs
+export const sacApi = {
+  listHearings: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/sac/hearings${query ? `?${query}` : ''}`);
+  },
+  getByApplication: (applicationId) => apiRequest(`/sac/hearings/${applicationId}`),
+  schedule: (payload) => apiRequest('/sac/hearings/schedule', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  recordRecommendation: (id, payload) => apiRequest(`/sac/hearings/${id}/recommendation`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+};
+
+// Competent Authority Decisions APIs
+export const decisionApi = {
+  listPending: () => apiRequest('/decisions/pending'),
+  getByApplication: (applicationId) => apiRequest(`/decisions/application/${applicationId}`),
+  renderDecision: (payload) => apiRequest('/decisions/render', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+};
+
+// Undertakings APIs
+export const undertakingApi = {
+  getTemplates: () => apiRequest('/undertakings/templates'),
+  getSubmissions: (applicationId) => apiRequest(`/undertakings/submissions/${applicationId}`),
+  submit: (payload) => apiRequest('/undertakings/submit', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  verify: (id, status, verificationRemarks) => apiRequest(`/undertakings/${id}/verify`, {
+    method: 'POST',
+    body: JSON.stringify({ status, verificationRemarks })
+  })
+};
+
+// Compliance APIs
+export const complianceApi = {
+  getObligations: (institutionId) => apiRequest(`/compliance/obligations/${institutionId}`),
+  getScorecard: (institutionId) => apiRequest(`/compliance/scorecard/${institutionId}`),
+  submitEvidence: (id, documentId, evidenceNotes) => apiRequest(`/compliance/obligations/${id}/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ documentId, evidenceNotes })
+  }),
+  reviewEvidence: (id, status, reviewNotes) => apiRequest(`/compliance/obligations/${id}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ status, reviewNotes })
+  })
+};
+
+// Notifications APIs
+export const notificationApi = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/notifications${query ? `?${query}` : ''}`);
+  },
+  markRead: (id) => apiRequest(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllRead: () => apiRequest('/notifications/read-all', { method: 'POST' })
+};
+
+// Escalations APIs
+export const escalationApi = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/escalations${query ? `?${query}` : ''}`);
+  },
+  scan: () => apiRequest('/escalations/scan', { method: 'POST' }),
+  resolve: (id, resolutionNotes) => apiRequest(`/escalations/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ resolutionNotes })
+  })
+};
+
+// Institution Profile APIs
+export const institutionApi = {
+  getById: (id) => apiRequest(`/institutions/${id}`),
+  update: (id, payload) => apiRequest(`/institutions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  }),
+  searchByPid: (aicteId) => apiRequest(`/institutions/search/pid/${aicteId}`)
+};
+
+// Reports APIs
+export const reportApi = {
+  getSummary: () => apiRequest('/reports/summary'),
+  getOfficerWorkload: () => apiRequest('/reports/officer-workload'),
+  exportApplications: (format = 'csv') => apiRequest(`/reports/export/applications?format=${format}`),
+  exportCompliance: (format = 'csv') => apiRequest(`/reports/export/compliance?format=${format}`)
+};
+
+// AI Advisory APIs
+export const aiApi = {
+  analyzeApplication: (applicationId) => apiRequest(`/ai/analyze-application/${applicationId}`),
+  classifyDocument: (payload) => apiRequest('/ai/classify-document', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  getSlaRisks: () => apiRequest('/ai/statutory-sla-risk')
 };
 
 // Comments APIs
