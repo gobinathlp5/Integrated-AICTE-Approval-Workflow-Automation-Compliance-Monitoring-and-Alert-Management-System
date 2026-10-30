@@ -6,6 +6,7 @@ const { ROLES } = require('../rbac');
 const { authenticateToken } = require('../auth');
 const { createNotification } = require('../notificationService');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
+const { runScheduledChecks } = require('../scheduler');
 
 /**
  * GET /api/escalations
@@ -114,6 +115,20 @@ router.post('/scan', authenticateToken, handleOverdueScan);
 router.post('/check-overdue', authenticateToken, handleOverdueScan);
 router.get('/scan', authenticateToken, handleOverdueScan);
 router.get('/check-overdue', authenticateToken, handleOverdueScan);
+
+/**
+ * POST /api/escalations/trigger-scheduled-checks
+ * Manually trigger background scheduler batch run (Council Officers & Admin)
+ */
+router.post('/trigger-scheduled-checks', authenticateToken, (req, res) => {
+  const canScan = [ROLES.SUPER_ADMIN, ROLES.AICTE_ADMIN, ROLES.REGIONAL_OFFICER, ROLES.BUREAU_OFFICER, ROLES.REGULATION_BUREAU].includes(req.user.role);
+  if (!canScan) {
+    return errorResponse(res, 'Permission Denied: Only Council Officers can trigger batch checks.', 403, 'FORBIDDEN');
+  }
+
+  const result = runScheduledChecks();
+  return successResponse(res, result, 'Background scheduler execution completed.');
+});
 
 /**
  * POST /api/escalations/:id/resolve

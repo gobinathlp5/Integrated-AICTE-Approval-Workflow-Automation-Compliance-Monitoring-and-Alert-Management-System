@@ -1,10 +1,18 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { db } = require('./db');
 const { ROLES } = require('./rbac');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'aicte-centralized-jwt-auth-secret-key-2026';
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is mandatory in production.');
+  }
+  JWT_SECRET = 'aicte-centralized-jwt-auth-secret-key-2026';
+}
+
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
 
@@ -201,6 +209,16 @@ async function authenticateUser({ username, password, ipAddress = '127.0.0.1', u
 
   // Check if MFA is required
   if (user.mfa_enabled) {
+    // Generate secure 6-digit cryptographic OTP (Prompt 3.1: remove universal 123456)
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = bcrypt.hashSync(otp, 10);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min TTL
+
+    db.prepare(`
+      UPDATE users SET mfa_temp_code = ?, mfa_code_expires_at = ?, mfa_attempts = 0
+      WHERE id = ?
+    `).run(otpHash, expiresAt, user.id);
+
     recordLoginHistory({
       userId: user.id,
       username,
@@ -215,12 +233,15 @@ async function authenticateUser({ username, password, ipAddress = '127.0.0.1', u
       { expiresIn: '5m' }
     );
 
+    const isNonProd = process.env.NODE_ENV !== 'production';
+
     return {
       success: true,
       requiresMfa: true,
       mfaSessionToken,
       userId: user.id,
-      message: 'MFA verification code required (Demo code: 123456).'
+      message: 'MFA 6-digit security code dispatched to registered contact channel.',
+      devOtpCode: isNonProd ? otp : undefined
     };
   }
 
@@ -247,34 +268,63 @@ async function authenticateUser({ username, password, ipAddress = '127.0.0.1', u
 
 /**
  * Verifies MFA code and issues final authorization session token
+ * SEC-RULE: Strictly removes universal/demo 123456 codes. Requires authentic dynamic OTP.
  */
 function verifyMfa({ mfaSessionToken, code, ipAddress = '127.0.0.1', userAgent = 'AICTE-Client' }) {
   try {
     const decoded = jwt.verify(mfaSessionToken, JWT_SECRET);
     if (!decoded.mfaPending || !decoded.id) {
-      return { success: false, statusCode: 400, error: 'Invalid MFA session token' };
+      return { success: false, statusCode: 400, error: 'Invalid MFA session token.' };
     }
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id);
     if (!user) {
-      return { success: false, statusCode: 404, error: 'User not found' };
+      return { success: false, statusCode: 404, error: 'User not found.' };
     }
 
-    // For standard demonstration, '123456' or user.mfa_secret is accepted
-    const validCodes = ['123456', user.mfa_secret || ''];
-    if (!validCodes.includes(code.trim())) {
+    if (!user.mfa_temp_code || !user.mfa_code_expires_at) {
+      return { success: false, statusCode: 400, error: 'No active MFA challenge found. Please re-authenticate.' };
+    }
+
+    if (new Date() > new Date(user.mfa_code_expires_at)) {
+      return { success: false, statusCode: 400, error: 'MFA verification code has expired. Please log in again.' };
+    }
+
+    const currentAttempts = (user.mfa_attempts || 0) + 1;
+    if (currentAttempts > 3) {
+      db.prepare('UPDATE users SET mfa_temp_code = NULL, mfa_code_expires_at = NULL WHERE id = ?').run(user.id);
+      recordLoginHistory({
+        userId: user.id,
+        username: user.username,
+        ipAddress,
+        userAgent,
+        status: 'MFA_LOCKED',
+        failureReason: 'Maximum MFA attempts exceeded'
+      });
+      return { success: false, statusCode: 429, error: 'Maximum MFA attempts exceeded. Challenge revoked. Please log in again.' };
+    }
+
+    const isMatch = bcrypt.compareSync(code.trim(), user.mfa_temp_code);
+    if (!isMatch) {
+      db.prepare('UPDATE users SET mfa_attempts = ? WHERE id = ?').run(currentAttempts, user.id);
       recordLoginHistory({
         userId: user.id,
         username: user.username,
         ipAddress,
         userAgent,
         status: 'MFA_FAILED',
-        failureReason: 'Invalid MFA verification code'
+        failureReason: `Invalid verification code (${3 - currentAttempts} attempts remaining)`
       });
-      return { success: false, statusCode: 401, error: 'Invalid MFA verification code. Use demo code 123456.' };
+      return { success: false, statusCode: 401, error: `Invalid MFA verification code. ${3 - currentAttempts} attempt(s) remaining.` };
     }
 
-    db.prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?').run(user.id);
+    // Success: Clear challenge and reset lockout
+    db.prepare(`
+      UPDATE users SET failed_login_attempts = 0, locked_until = NULL,
+                       mfa_temp_code = NULL, mfa_code_expires_at = NULL, mfa_attempts = 0
+      WHERE id = ?
+    `).run(user.id);
+
     recordLoginHistory({
       userId: user.id,
       username: user.username,
@@ -293,8 +343,54 @@ function verifyMfa({ mfaSessionToken, code, ipAddress = '127.0.0.1', userAgent =
       dashboardRoute
     };
   } catch (err) {
-    return { success: false, statusCode: 401, error: 'MFA session expired or invalid' };
+    return { success: false, statusCode: 401, error: 'MFA session expired or invalid.' };
   }
+}
+
+/**
+ * Initiates secure password recovery token
+ */
+function initiatePasswordRecovery(emailOrUsername) {
+  const user = db.prepare('SELECT * FROM users WHERE email = ? OR username = ?').get(emailOrUsername, emailOrUsername);
+  if (!user) {
+    // Return generic success to prevent account enumeration
+    return { success: true, message: 'If an account matches those details, recovery instructions have been dispatched.' };
+  }
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min TTL
+
+  db.prepare('UPDATE users SET reset_token = ?, reset_token_expires_at = ? WHERE id = ?').run(resetToken, expiresAt, user.id);
+
+  const isNonProd = process.env.NODE_ENV !== 'production';
+  return {
+    success: true,
+    message: 'If an account matches those details, recovery instructions have been dispatched.',
+    devResetToken: isNonProd ? resetToken : undefined
+  };
+}
+
+/**
+ * Completes secure password reset
+ */
+function completePasswordReset(token, newPassword) {
+  if (!token || !newPassword || newPassword.length < 8) {
+    return { success: false, statusCode: 400, error: 'Valid token and strong password (min 8 characters) required.' };
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE reset_token = ?').get(token);
+  if (!user || !user.reset_token_expires_at || new Date() > new Date(user.reset_token_expires_at)) {
+    return { success: false, statusCode: 400, error: 'Password reset link is invalid or has expired.' };
+  }
+
+  const passwordHash = bcrypt.hashSync(newPassword, 10);
+  db.prepare(`
+    UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires_at = NULL,
+                     failed_login_attempts = 0, locked_until = NULL
+    WHERE id = ?
+  `).run(passwordHash, user.id);
+
+  return { success: true, message: 'Password has been successfully reset. Please log in with your new credentials.' };
 }
 
 /**
@@ -346,5 +442,7 @@ module.exports = {
   verifyMfa,
   recordLoginHistory,
   getAuthorizedDashboard,
-  sanitizeUser
+  sanitizeUser,
+  initiatePasswordRecovery,
+  completePasswordReset
 };

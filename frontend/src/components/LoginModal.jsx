@@ -57,7 +57,13 @@ export default function LoginModal({ onLoginSuccess }) {
 
   // MFA Challenge State
   const [mfaSessionToken, setMfaSessionToken] = useState('');
-  const [mfaCode, setMfaCode] = useState('123456');
+  const [mfaCode, setMfaCode] = useState('');
+  const [devOtp, setDevOtp] = useState('');
+
+  // Password Recovery State
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryInput, setRecoveryInput] = useState('');
+  const [recoverySuccess, setRecoverySuccess] = useState('');
 
   // Registration State (matching Image 1 & Image 2)
   const [selectedUserType, setSelectedUserType] = useState('INSTITUTION');
@@ -89,6 +95,9 @@ export default function LoginModal({ onLoginSuccess }) {
         setMfaSessionToken(res.mfaSessionToken);
         setActiveMode('mfa');
         setSuccessMsg(res.message);
+        if (res.devOtpCode) {
+          setDevOtp(res.devOtpCode);
+        }
         return;
       }
 
@@ -588,10 +597,15 @@ export default function LoginModal({ onLoginSuccess }) {
                 value={mfaCode}
                 onChange={(e) => setMfaCode(e.target.value)}
                 className="w-full text-center tracking-widest text-2xl font-mono py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-900"
-                placeholder="123456"
+                placeholder="••••••"
                 required
+                autoFocus
               />
-              <p className="text-[10px] text-slate-400">Default demo code: 123456</p>
+              {devOtp && (
+                <div className="bg-blue-50 border border-blue-200 text-blue-900 p-2 rounded text-[11px] font-mono">
+                  🔑 Dev Test OTP: <span className="font-bold tracking-wider">{devOtp}</span>
+                </div>
+              )}
 
               <div className="flex space-x-2">
                 <button

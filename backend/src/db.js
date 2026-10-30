@@ -527,6 +527,13 @@ function initDb() {
     BEGIN
       SELECT RAISE(FAIL, 'Audit trail records are tamper-proof and cannot be deleted.');
     END;
+
+    -- Versioned Database Migrations Tracker
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Safely check and add any missing columns in existing tables
@@ -543,6 +550,14 @@ function initDb() {
         console.warn(`Column check failed for ${tableName}:`, e.message);
       }
     };
+
+    ensureColumns('users', {
+      mfa_temp_code: "TEXT",
+      mfa_code_expires_at: "DATETIME",
+      mfa_attempts: "INTEGER DEFAULT 0",
+      reset_token: "TEXT",
+      reset_token_expires_at: "DATETIME"
+    });
 
     ensureColumns('applications', {
       current_stage: "TEXT DEFAULT 'SUBMITTED'",
@@ -642,6 +657,24 @@ function initDb() {
       evidence_notes: "TEXT",
       submitted_at: "DATETIME"
     });
+
+    // Record and execute versioned schema migrations
+    const migrations = [
+      { version: 1, name: 'Core Schema (Users, Institutions, Applications)' },
+      { version: 2, name: 'Workflow Templates and Transition History' },
+      { version: 3, name: 'Scrutiny Evaluations and Deficiencies' },
+      { version: 4, name: 'EVC Committees, Members, Inspections and Evidence' },
+      { version: 5, name: 'SAC Committees and Hearings' },
+      { version: 6, name: 'Competent Authority Decisions and Undertakings' },
+      { version: 7, name: 'Compliance Obligations, Notifications and Escalations' },
+      { version: 8, name: 'Document Security, Audit Trail and Immutable Triggers' },
+      { version: 9, name: 'Cryptographic MFA, Account Recovery and Institutional Verification Lifecycle' }
+    ];
+
+    const recordMigration = db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (?, ?)');
+    for (const m of migrations) {
+      recordMigration.run(m.version, m.name);
+    }
   } catch (err) {
     console.warn('Column migration check notice:', err.message);
   }

@@ -89,6 +89,14 @@ router.post('/', authenticateToken, (req, res) => {
     return res.status(404).json({ error: 'Institution not found.' });
   }
 
+  // Section 3.3: Unverified institutions cannot submit applications
+  if (inst.status === 'PENDING_VERIFICATION' || !inst.verified) {
+    return res.status(403).json({
+      error: 'Institution Pending Verification',
+      message: 'Institution accreditation and legal credentials are under review by the AICTE Regional Directorate. Application dossiers cannot be created until official verification is approved.'
+    });
+  }
+
   const appId = 'app_' + uuidv4().slice(0, 10);
   const appNumber = `AICTE-${academicYear}-${inst.code || Math.floor(100000 + Math.random() * 900000)}`;
   const finalRegion = region || inst.region || req.user.region || 'Northern';

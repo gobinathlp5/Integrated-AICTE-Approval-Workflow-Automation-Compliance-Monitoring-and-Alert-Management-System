@@ -75,9 +75,9 @@ async function runE2EWorkflowTests() {
       regToken = data.token;
       institutionId = data.user?.institution_id;
       assert(
-        res.status === 201 && regToken && institutionId,
-        'STEP 1: Public institution self-registration completed (Role: INSTITUTION_ADMIN)',
-        { institutionCode: instCode, institutionId }
+        res.status === 201 && regToken && institutionId && data.institutionStatus === 'PENDING_VERIFICATION',
+        'STEP 1: Public institution onboarding initiated in PENDING_VERIFICATION state',
+        { institutionCode: instCode, institutionId, status: data.institutionStatus }
       );
     }
 
@@ -93,6 +93,44 @@ async function runE2EWorkflowTests() {
     const evcToken = generateAuthToken(evcMember);
     const sacToken = generateAuthToken(sacMember);
     const caToken = generateAuthToken(caOfficer);
+
+    // 1b. Unverified Institution Blocked from Creating Applications (Prompt 3.3)
+    {
+      const prematureAppRes = await fetch(`${baseUrl}/api/applications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${regToken}`
+        },
+        body: JSON.stringify({
+          academicYear: '2026-27',
+          applicationType: 'EXTENSION_OF_APPROVAL',
+          region: 'Northern'
+        })
+      });
+      assert(
+        prematureAppRes.status === 403,
+        'STEP 1b: Unverified institution strictly blocked from submitting applications (HTTP 403)',
+        { status: prematureAppRes.status }
+      );
+    }
+
+    // 1c. Regional Officer Verifies Institution Affiliation
+    {
+      const verifyInstRes = await fetch(`${baseUrl}/api/institutions/${institutionId}/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${roToken}`
+        }
+      });
+      const verifyInstData = await safeJson(verifyInstRes);
+      assert(
+        verifyInstRes.status === 200 && verifyInstData.success && verifyInstData.data?.status === 'ACTIVE',
+        'STEP 1c: AICTE Regional Officer verifies institution credentials and activates account',
+        { institutionId, status: verifyInstData.data?.status }
+      );
+    }
 
     // 2. Application Submission
     let applicationId;
@@ -120,37 +158,36 @@ async function runE2EWorkflowTests() {
       applicationNumber = data.data?.applicationNumber || data.application_number;
       assert(
         (res.status === 200 || res.status === 201) && applicationId,
-        'STEP 2: Institutional applicant creates application dossier',
+        'STEP 2: Verified institutional applicant creates application dossier',
         { applicationId, applicationNumber }
       );
     }
 
-    // 3. Document Upload with SHA-256 & Audit Trail
+    // 3. Genuine Multipart Document Upload with SHA-256 & Magic Bytes (Prompt 3.5)
     let docId;
     {
+      const formData = new FormData();
+      const pdfBytes = Buffer.from('%PDF-1.4\n%AICTE Statutory Archive - Land Deed Master Plan\n%%EOF');
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      formData.append('file', blob, 'land_deed_master.pdf');
+      formData.append('applicationId', applicationId);
+      formData.append('title', 'Registered Land Deed & Municipal Approval Plan');
+      formData.append('documentCategory', 'MANDATORY_DISCLOSURE');
+      formData.append('folderCategory', 'LAND_AND_BUILDING');
+      formData.append('confidentialityClassification', 'INSTITUTION_VISIBLE');
+
       const res = await fetch(`${baseUrl}/api/documents/upload`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${regToken}`
         },
-        body: JSON.stringify({
-          applicationId,
-          title: 'Registered Land Deed & Municipal Approval Plan',
-          fileName: 'land_deed_master.pdf',
-          filePath: 'uploads/land_deed_master.pdf',
-          fileSize: 450210,
-          fileType: 'application/pdf',
-          documentCategory: 'MANDATORY_DISCLOSURE',
-          folderCategory: 'LAND_AND_BUILDING',
-          confidentialityClassification: 'INSTITUTION_VISIBLE'
-        })
+        body: formData
       });
       const data = await safeJson(res);
       docId = data.document?.id || data.data?.id || data.id;
       assert(
         (res.status === 200 || res.status === 201) && docId,
-        'STEP 3: Mandatory land and governance documents uploaded with SHA-256 integrity hash',
+        'STEP 3: Genuine multipart statutory PDF document uploaded with verified magic bytes and SHA-256 integrity hash',
         { docId, checksumSha256: data.document?.checksum_sha256 }
       );
     }

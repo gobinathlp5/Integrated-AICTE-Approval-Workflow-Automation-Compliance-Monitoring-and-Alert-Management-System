@@ -201,4 +201,64 @@ router.post('/:id/verify', authenticateToken, (req, res) => {
   return successResponse(res, { institutionId: req.params.id, status: 'ACTIVE' }, 'Institution verified and activated.');
 });
 
+/**
+ * POST /api/institutions/:id/reject
+ */
+router.post('/:id/reject', authenticateToken, (req, res) => {
+  const canVerify = [ROLES.SUPER_ADMIN, ROLES.AICTE_ADMIN, ROLES.REGIONAL_OFFICER].includes(req.user.role);
+  if (!canVerify) {
+    return errorResponse(res, 'Permission Denied: Regional Officer or Admin authority required.', 403, 'FORBIDDEN');
+  }
+  const { reason = 'Registration credentials rejected due to non-compliance with AICTE criteria.' } = req.body;
+
+  db.prepare(`
+    UPDATE institutions SET
+      status = 'REJECTED',
+      verified = 0,
+      verified_by = ?,
+      verified_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(req.user.full_name, req.params.id);
+
+  createNotification({
+    institutionId: req.params.id,
+    title: 'Institution Registration Rejected',
+    message: reason,
+    type: 'DEFICIENCY',
+    link: '/profile'
+  });
+
+  return successResponse(res, { institutionId: req.params.id, status: 'REJECTED' }, 'Institution registration rejected.');
+});
+
+/**
+ * POST /api/institutions/:id/request-corrections
+ */
+router.post('/:id/request-corrections', authenticateToken, (req, res) => {
+  const canVerify = [ROLES.SUPER_ADMIN, ROLES.AICTE_ADMIN, ROLES.REGIONAL_OFFICER].includes(req.user.role);
+  if (!canVerify) {
+    return errorResponse(res, 'Permission Denied: Regional Officer or Admin authority required.', 403, 'FORBIDDEN');
+  }
+  const { correctionsRequired = 'Please update land and cadastral survey documentation.' } = req.body;
+
+  db.prepare(`
+    UPDATE institutions SET
+      status = 'CORRECTIONS_REQUESTED',
+      verified = 0,
+      verified_by = ?,
+      verified_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(req.user.full_name, req.params.id);
+
+  createNotification({
+    institutionId: req.params.id,
+    title: 'Corrections Requested on Registration',
+    message: correctionsRequired,
+    type: 'WARNING',
+    link: '/profile'
+  });
+
+  return successResponse(res, { institutionId: req.params.id, status: 'CORRECTIONS_REQUESTED' }, 'Corrections requested from institution.');
+});
+
 module.exports = router;

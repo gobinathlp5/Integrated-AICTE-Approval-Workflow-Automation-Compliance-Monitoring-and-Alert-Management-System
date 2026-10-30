@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const { initDb } = require('./db');
 const { seedDatabase } = require('./seed');
+const { startScheduler } = require('./scheduler');
 
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -93,6 +94,7 @@ app.use((err, req, res, next) => {
 // Start server
 if (require.main === module) {
   initDb();
+  startScheduler();
   app.listen(PORT, () => {
     console.log(`=======================================================`);
     console.log(`AICTE Integrated Approval Workflow & Compliance System`);

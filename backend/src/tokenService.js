@@ -1,6 +1,12 @@
 const crypto = require('crypto');
 
-const SECRET_KEY = process.env.TOKEN_SECRET || 'aicte-secure-signing-key-2026-super-secret-salt';
+let SECRET_KEY = process.env.DOC_TOKEN_SECRET || process.env.TOKEN_SECRET;
+if (!SECRET_KEY) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL SECURITY ERROR: DOC_TOKEN_SECRET environment variable is mandatory in production.');
+  }
+  SECRET_KEY = 'aicte-secure-signing-key-2026-super-secret-salt';
+}
 
 /**
  * Generates an HMAC-SHA256 signed temporary download token

@@ -90,6 +90,93 @@ async function runApiIntegrationTests() {
       );
     }
 
+    // 2b. Auth: Cryptographic Dynamic MFA Challenge & Universal 123456 Bypass Block
+    {
+      // Enable MFA for instadmin
+      db.prepare("UPDATE users SET mfa_enabled = 1, locked_until = NULL, failed_login_attempts = 0 WHERE username = 'instadmin'").run();
+
+      // Login attempt -> returns MFA required
+      const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'instadmin', password: 'Password@123' })
+      });
+      const loginData = await safeJson(loginRes);
+      assert(
+        loginRes.status === 200 && loginData.requiresMfa && loginData.mfaSessionToken,
+        'MFA-enabled account triggers dynamic second-factor challenge',
+        { requiresMfa: loginData.requiresMfa }
+      );
+
+      // Attempt universal bypass '123456' -> must be REJECTED (Prompt 3.1)
+      const bypassRes = await fetch(`${baseUrl}/api/auth/verify-mfa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mfaSessionToken: loginData.mfaSessionToken,
+          code: '123456'
+        })
+      });
+      assert(
+        bypassRes.status === 401,
+        'Universal demo MFA bypass (123456) is strictly rejected (HTTP 401)',
+        { status: bypassRes.status }
+      );
+
+      // Authenticate with genuine delivered cryptographic OTP
+      if (loginData.devOtpCode) {
+        const validMfaRes = await fetch(`${baseUrl}/api/auth/verify-mfa`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mfaSessionToken: loginData.mfaSessionToken,
+            code: loginData.devOtpCode
+          })
+        });
+        const validMfaData = await safeJson(validMfaRes);
+        assert(
+          validMfaRes.status === 200 && validMfaData.token,
+          'Dynamic cryptographic OTP succeeds and issues authorized session token',
+          { user: validMfaData.user?.username }
+        );
+      }
+
+      // Reset MFA for instadmin back to 0
+      db.prepare("UPDATE users SET mfa_enabled = 0 WHERE username = 'instadmin'").run();
+    }
+
+    // 2c. Auth: Account Recovery and Password Reset
+    {
+      const recoverRes = await fetch(`${baseUrl}/api/auth/recover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailOrUsername: 'instadmin' })
+      });
+      const recoverData = await safeJson(recoverRes);
+      assert(
+        recoverRes.status === 200 && recoverData.success,
+        'Account recovery request dispatches secure time-limited token',
+        { success: recoverData.success }
+      );
+
+      if (recoverData.devResetToken) {
+        const resetRes = await fetch(`${baseUrl}/api/auth/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: recoverData.devResetToken,
+            newPassword: 'Password@123'
+          })
+        });
+        const resetData = await safeJson(resetRes);
+        assert(
+          resetRes.status === 200 && resetData.success,
+          'Password reset flow completes securely with validated token',
+          { success: resetData.success }
+        );
+      }
+    }
+
     // 3. Auth: Quick-switch blocked in production
     {
       process.env.NODE_ENV = 'production';

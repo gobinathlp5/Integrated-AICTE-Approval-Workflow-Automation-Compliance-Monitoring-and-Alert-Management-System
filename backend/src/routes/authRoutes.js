@@ -11,7 +11,9 @@ const {
   recordLoginHistory,
   generateAuthToken,
   getAuthorizedDashboard,
-  sanitizeUser
+  sanitizeUser,
+  initiatePasswordRecovery,
+  completePasswordReset
 } = require('../auth');
 
 /**
@@ -108,8 +110,8 @@ router.post('/register', (req, res) => {
   if (!institutionId) {
     institutionId = 'inst_' + uuidv4().slice(0, 8);
     db.prepare(`
-      INSERT INTO institutions (id, code, name, type, region, state, city, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+      INSERT INTO institutions (id, code, name, type, region, state, city, status, verified)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING_VERIFICATION', 0)
     `).run(
       institutionId,
       institutionCode,
@@ -147,9 +149,10 @@ router.post('/register', (req, res) => {
 
   return res.status(201).json({
     success: true,
-    message: 'Institution account registered and activated successfully.',
+    message: 'Institution account registered successfully. Status: PENDING_VERIFICATION. Credentials must be verified by AICTE Regional Directorate before submitting applications.',
     token,
     user: sanitizeUser(newUser),
+    institutionStatus: 'PENDING_VERIFICATION',
     dashboardRoute
   });
 });
@@ -240,8 +243,35 @@ router.post('/toggle-mfa', authenticateToken, (req, res) => {
   return res.json({ 
     success: true, 
     mfaEnabled: newStatus === 1,
-    message: newStatus === 1 ? 'MFA enabled. Demo code: 123456' : 'MFA disabled.' 
+    message: newStatus === 1 ? 'MFA enabled. Dynamic cryptographic OTP challenge is now required on login.' : 'MFA disabled.' 
   });
+});
+
+/**
+ * POST /api/auth/recover
+ * Initiate password recovery / account recovery
+ */
+router.post('/recover', (req, res) => {
+  const { emailOrUsername } = req.body;
+  if (!emailOrUsername) {
+    return res.status(400).json({ error: 'Username or registered email address required.' });
+  }
+
+  const result = initiatePasswordRecovery(emailOrUsername);
+  return res.json(result);
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Complete password reset using secure token
+ */
+router.post('/reset-password', (req, res) => {
+  const { token, newPassword } = req.body;
+  const result = completePasswordReset(token, newPassword);
+  if (!result.success) {
+    return res.status(result.statusCode || 400).json({ error: result.error });
+  }
+  return res.json(result);
 });
 
 module.exports = router;

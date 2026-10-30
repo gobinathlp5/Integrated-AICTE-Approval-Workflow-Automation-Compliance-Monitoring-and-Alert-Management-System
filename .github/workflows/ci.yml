@@ -1,0 +1,59 @@
+name: AICTE Platform CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-tests:
+    name: Backend Security & E2E Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: backend/package.json
+
+      - name: Install Backend Dependencies
+        run: npm --prefix backend ci
+
+      - name: Execute Security & Access Control Suite
+        run: npm --prefix backend run test:security
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test_jwt_secret_token_government_grade_ci_2026
+          DOC_TOKEN_SECRET: test_doc_token_secret_government_grade_ci_2026
+
+      - name: Execute Full API Integration & Workflow Tests
+        run: npm --prefix backend test
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test_jwt_secret_token_government_grade_ci_2026
+          DOC_TOKEN_SECRET: test_doc_token_secret_government_grade_ci_2026
+
+  frontend-build:
+    name: Frontend Compilation & Asset Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        run: npm --prefix frontend ci
+
+      - name: Build Production Client
+        run: npm --prefix frontend run build
