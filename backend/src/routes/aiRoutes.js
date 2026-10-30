@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db');
-const { authenticateToken, requirePermission } = require('../rbac');
+const { authenticateToken } = require('../auth');
+const { hasPermission, PERMISSIONS } = require('../rbac');
 
 // AI Assistant Advisory Endpoints (Strictly advisory, read-only decision support)
 

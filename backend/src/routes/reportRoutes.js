@@ -1,7 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db');
-const { authenticateToken, requirePermission } = require('../rbac');
+const { authenticateToken } = require('../auth');
+const { hasPermission, PERMISSIONS } = require('../rbac');
+
+const requireExportPermission = (req, res, next) => {
+  if (!hasPermission(req.user, PERMISSIONS.EXPORT)) {
+    return res.status(403).json({ error: 'Forbidden', message: 'Insufficient permission to export statutory data.' });
+  }
+  next();
+};
 
 // 1. Comprehensive System Analytics & Summary
 router.get('/summary', authenticateToken, (req, res) => {
@@ -72,7 +80,7 @@ router.get('/summary', authenticateToken, (req, res) => {
 });
 
 // 2. Export Applications Report (CSV / JSON)
-router.get('/export/applications', authenticateToken, requirePermission('EXPORT'), (req, res) => {
+router.get('/export/applications', authenticateToken, requireExportPermission, (req, res) => {
   const db = getDb();
   const format = req.query.format || 'csv';
 
@@ -126,7 +134,7 @@ router.get('/export/applications', authenticateToken, requirePermission('EXPORT'
 });
 
 // 3. Export Compliance & Risk Report (CSV / JSON)
-router.get('/export/compliance', authenticateToken, requirePermission('EXPORT'), (req, res) => {
+router.get('/export/compliance', authenticateToken, requireExportPermission, (req, res) => {
   const db = getDb();
   const format = req.query.format || 'csv';
 
@@ -177,7 +185,7 @@ router.get('/officer-workload', authenticateToken, (req, res) => {
   const db = getDb();
 
   const officers = db.prepare(`
-    SELECT u.id, u.name, u.email, u.role, u.region,
+    SELECT u.id, u.full_name as name, u.email, u.role, u.region,
       (SELECT COUNT(*) FROM scrutiny_evaluations s WHERE s.scrutiny_officer_id = u.id) as scrutiny_assigned,
       (SELECT COUNT(*) FROM evc_inspections e WHERE e.committee_leader_id = u.id) as inspections_led,
       (SELECT COUNT(*) FROM authority_decisions d WHERE d.authority_user_id = u.id) as decisions_rendered
