@@ -1,0 +1,22 @@
+{
+  "name": "aicte-access-management-platform",
+  "version": "1.0.0",
+  "description": "Centralized Login, Role-Based Accessibility & Document Visibility Platform for AICTE",
+  "scripts": {
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run dev",
+    "seed": "cd backend && npm run seed",
+    "test": "cd backend && npm test",
+    "build": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "aicte",
+    "sih",
+    "rbac",
+    "abac",
+    "security",
+    "audit-trail"
+  ],
+  "author": "AICTE Platform Engineering",
+  "license": "UNLICENSED"
+}
