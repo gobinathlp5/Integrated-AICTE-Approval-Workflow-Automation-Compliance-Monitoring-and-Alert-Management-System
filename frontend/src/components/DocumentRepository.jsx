@@ -117,8 +117,8 @@ export default function DocumentRepository({ user }) {
       {/* Top Bar with Title & Upload CTA */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <FileText className="w-5 h-5 text-blue-900" />
+          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2 font-serif">
+            <FileText className="w-5 h-5 text-[#122749]" />
             <span>AICTE Document Repository & Access Management</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -129,9 +129,9 @@ export default function DocumentRepository({ user }) {
         {canUpload && (
           <button
             onClick={() => setUploadOpen(true)}
-            className="inline-flex items-center space-x-1.5 bg-blue-900 hover:bg-blue-950 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs self-start sm:self-auto cursor-pointer"
+            className="inline-flex items-center space-x-1.5 bg-[#122749] hover:bg-[#0c1a32] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs self-start sm:self-auto cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-amber-400" />
             <span>Upload Statutory Document</span>
           </button>
         )}

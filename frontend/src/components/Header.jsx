@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Shield, User, Building, MapPin, LogOut, CheckCircle2, 
-  ChevronDown, Key, RefreshCw, FileText, Lock, Award, Users, Activity
+  Shield, Volume2, User, Building, MapPin, LogOut, CheckCircle2, 
+  ChevronDown, Key, RefreshCw, FileText, Lock, Award, Users, Activity,
+  Globe, Bell, ExternalLink
 } from 'lucide-react';
+import { AicteEmblem, NationalEmblem, G20Logo } from './AicteLogo';
 
 export const ROLE_LABELS = {
   SUPER_ADMIN: 'Super Administrator',
@@ -41,6 +43,19 @@ const DEMO_PRESETS = [
 export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch, onLogout }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [dateTimeStr, setDateTimeStr] = useState('');
+  const [fontSize, setFontSize] = useState(100);
+
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
+      const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true };
+      setDateTimeStr(now.toLocaleString('en-US', options).replace(/,/g, ' ,'));
+    };
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSelectPreset = async (preset) => {
     setIsSwitching(true);
@@ -55,59 +70,68 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
   const isAdmin = user && (user.role === 'SUPER_ADMIN' || user.role === 'AICTE_ADMIN');
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
-      {/* Tricolor Government of India Top Banner */}
-      <div className="h-1 bg-gradient-to-r from-amber-500 via-white to-emerald-600" />
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs font-sans">
       
-      {/* Council Top Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div className="flex items-center justify-between gap-4">
+      {/* 1. Official Government Top Utility Bar (Black / Dark Gray, as seen in Image 3 & 4) */}
+      <div className="bg-[#1e232a] text-slate-300 text-[11px] py-1 px-4 border-b border-slate-700/60">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           
-          {/* Logo & Platform Title */}
-          <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-lg bg-linear-to-br from-blue-900 to-indigo-950 flex items-center justify-center text-white shadow-md border border-amber-500/40">
-              <Shield className="w-6 h-6 text-amber-400" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold tracking-widest uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                  Government of India • Ministry of Education
-                </span>
-                <span className="text-xs text-slate-500 hidden md:inline">e-Governance Cell</span>
-              </div>
-              <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                AICTE Centralized Access Management Portal
-              </h1>
-            </div>
+          {/* Left: Date, Time & Screen Reader Access */}
+          <div className="flex items-center space-x-4">
+            <span className="font-mono text-slate-300">
+              {dateTimeStr || 'Friday , 10-30-2026 ,2:37 PM'}
+            </span>
+            <span className="text-slate-600 hidden sm:inline">|</span>
+            <button className="hidden sm:flex items-center space-x-1 text-slate-300 hover:text-white transition">
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Screen Reader Access</span>
+            </button>
           </div>
 
-          {/* User Profile & Demo Switcher */}
+          {/* Right: Text Size, Hindi Toggle, Social, and Login Status */}
           <div className="flex items-center space-x-3">
             
-            {/* Quick Role Switcher Pill */}
+            {/* Text Size Controls */}
+            <div className="hidden md:flex items-center space-x-1.5 text-slate-300">
+              <span className="text-[10px]">Text Size</span>
+              <button onClick={() => setFontSize(90)} className="px-1 hover:text-white font-bold cursor-pointer">A-</button>
+              <button onClick={() => setFontSize(100)} className="px-1 hover:text-white font-bold cursor-pointer">A</button>
+              <button onClick={() => setFontSize(110)} className="px-1 hover:text-white font-bold cursor-pointer">A+</button>
+            </div>
+
+            <span className="text-slate-600 hidden md:inline">|</span>
+
+            {/* Language Toggle Badge */}
+            <div className="bg-[#f59e0b] text-slate-950 px-2 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 shadow-2xs">
+              <span>अ/A हिन्दी</span>
+            </div>
+
+            <span className="text-slate-600">|</span>
+
+            {/* Quick Demo Role Switcher Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center space-x-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer"
-                title="Switch role for testing & demonstration"
+                className="bg-[#f59e0b] hover:bg-amber-400 text-slate-950 font-bold px-2.5 py-0.5 rounded text-[11px] flex items-center space-x-1 transition shadow-xs cursor-pointer"
+                title="Switch AICTE System Role"
               >
-                <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isSwitching ? 'animate-spin' : ''}`} />
-                <span className="font-semibold hidden sm:inline">Role Switcher:</span>
-                <span className="bg-indigo-600 text-white px-2 py-0.5 rounded font-bold">
-                  {user ? (ROLE_LABELS[user.role] || user.role) : 'Guest'}
+                <RefreshCw className={`w-3 h-3 text-slate-900 ${isSwitching ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Role:</span>
+                <span className="underline decoration-slate-900 font-black">
+                  {user ? (ROLE_LABELS[user.role] || user.role) : 'Login'}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-indigo-500" />
+                <ChevronDown className="w-3 h-3 text-slate-950" />
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 max-h-96 overflow-y-auto">
-                  <div className="px-3 py-1.5 border-b border-slate-100 bg-slate-50">
-                    <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Demo Role Impersonator (All 13 Roles)
+                <div className="absolute right-0 mt-1 w-80 bg-white rounded-xl shadow-2xl border border-slate-300 py-2 z-50 max-h-96 overflow-y-auto">
+                  <div className="px-3 py-1.5 border-b border-slate-100 bg-amber-50">
+                    <p className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
+                      Demo Role Switcher (All 13 AICTE Personas)
                     </p>
-                    <p className="text-[11px] text-slate-500">
-                      Switch instantly to test RBAC and tenant isolation
+                    <p className="text-[10px] text-amber-700">
+                      Instantly test RBAC permissions and data isolation
                     </p>
                   </div>
                   <div className="divide-y divide-slate-100">
@@ -117,16 +141,14 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
                         <button
                           key={p.username}
                           onClick={() => handleSelectPreset(p)}
-                          className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-indigo-50 transition ${
-                            isCurrent ? 'bg-indigo-50/80 font-semibold text-indigo-950' : 'text-slate-700'
+                          className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-amber-50 transition ${
+                            isCurrent ? 'bg-amber-100/60 font-semibold text-slate-900' : 'text-slate-700'
                           }`}
                         >
                           <div>
-                            <div className="font-medium text-slate-900">{p.label}</div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                              <span className="font-mono text-indigo-700">@{p.username}</span>
-                              <span>•</span>
-                              <span>{p.tag}</span>
+                            <div className="font-semibold text-slate-900">{p.label}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">
+                              @{p.username} • {p.tag}
                             </div>
                           </div>
                           {isCurrent && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
@@ -138,131 +160,160 @@ export default function Header({ user, currentTab, setCurrentTab, onQuickSwitch,
               )}
             </div>
 
-            {/* User Info Capsule */}
+            {/* Logout Button */}
             {user && (
-              <div className="hidden lg:flex items-center space-x-2 pl-2 border-l border-slate-200">
-                <div className="text-right">
-                  <div className="text-xs font-bold text-slate-900 truncate max-w-[140px]">
-                    {user.full_name}
-                  </div>
-                  <div className="text-[10px] text-slate-500 flex items-center justify-end gap-1">
-                    {user.institution_id ? (
-                      <span className="text-amber-700 font-medium">Institution Tenant</span>
-                    ) : (
-                      <span className="text-blue-700 font-medium">{user.region || 'HQ'}</span>
-                    )}
-                    {user.mfa_enabled ? (
-                      <span className="bg-emerald-100 text-emerald-800 px-1 rounded text-[9px]">MFA</span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
+              <button
+                onClick={onLogout}
+                className="text-slate-300 hover:text-red-400 p-0.5 rounded transition"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             )}
 
-            {/* Logout */}
-            <button
-              onClick={onLogout}
-              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
+
         </div>
       </div>
 
-      {/* Navigation Tabs Bar */}
-      <div className="bg-slate-50 border-t border-slate-200 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center space-x-1 overflow-x-auto py-1 scrollbar-none">
+      {/* 2. Official AICTE Main Header Banner (White Background, matching Image 1, 3 & 4) */}
+      <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          
+          {/* Left: AICTE Circular Logo + Bilingual Devanagari & English Names */}
+          <div className="flex items-center space-x-3.5">
+            <AicteEmblem className="w-14 h-14 md:w-16 md:h-16 shrink-0" />
+            <div>
+              <h2 className="text-sm md:text-base font-bold text-slate-800 tracking-tight leading-tight">
+                अखिल भारतीय तकनीकी शिक्षा परिषद
+              </h2>
+              <h1 className="text-base md:text-xl font-bold text-slate-900 tracking-tight leading-tight font-serif">
+                All India Council for Technical Education
+              </h1>
+              <p className="text-[11px] text-slate-500 font-medium">
+                (A Statutory Body of the Government of India)
+              </p>
+            </div>
+          </div>
+
+          {/* Right: National Emblem + Ministry of Education + G20 Bharat 2023 Motif */}
+          <div className="hidden lg:flex items-center space-x-6 border-l border-slate-200 pl-6">
+            <div className="flex items-center space-x-2">
+              <NationalEmblem className="w-6 h-8" />
+              <div>
+                <div className="text-xs font-bold text-slate-800 leading-tight">शिक्षा मंत्रालय</div>
+                <div className="text-xs font-bold text-slate-900 leading-tight">Ministry of Education</div>
+                <div className="text-[10px] text-slate-500">Government of India</div>
+              </div>
+            </div>
+
+            <G20Logo className="w-16 h-8" />
+          </div>
+
+        </div>
+      </div>
+
+      {/* 3. Primary Navigation Bar (Navy Blue #132a4e with Bright Gold #f5a623 Active Highlights, matching Image 3 & 4) */}
+      <nav className="bg-[#122749] text-white shadow-md border-t border-blue-900">
+        <div className="max-w-7xl mx-auto px-4 flex items-center overflow-x-auto scrollbar-none">
           
           <button
             onClick={() => setCurrentTab('dashboard')}
-            className={`px-3 py-2 text-xs font-semibold rounded-md flex items-center space-x-1.5 transition whitespace-nowrap ${
+            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
               currentTab === 'dashboard'
-                ? 'bg-blue-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                : 'text-white hover:bg-[#1a365d] border-transparent'
             }`}
           >
-            <Activity className="w-3.5 h-3.5" />
-            <span>Dashboard</span>
+            Dashboard
           </button>
 
           <button
             onClick={() => setCurrentTab('documents')}
-            className={`px-3 py-2 text-xs font-semibold rounded-md flex items-center space-x-1.5 transition whitespace-nowrap ${
+            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
               currentTab === 'documents'
-                ? 'bg-blue-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                : 'text-white hover:bg-[#1a365d] border-transparent'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Document Repository</span>
+            Document Repository
           </button>
 
           <button
             onClick={() => setCurrentTab('applications')}
-            className={`px-3 py-2 text-xs font-semibold rounded-md flex items-center space-x-1.5 transition whitespace-nowrap ${
+            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
               currentTab === 'applications'
-                ? 'bg-blue-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                : 'text-white hover:bg-[#1a365d] border-transparent'
             }`}
           >
-            <Building className="w-3.5 h-3.5" />
-            <span>Applications & Processing</span>
+            Applications & Processing
           </button>
 
           <button
             onClick={() => setCurrentTab('comments')}
-            className={`px-3 py-2 text-xs font-semibold rounded-md flex items-center space-x-1.5 transition whitespace-nowrap ${
+            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
               currentTab === 'comments'
-                ? 'bg-blue-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                : 'text-white hover:bg-[#1a365d] border-transparent'
             }`}
           >
-            <Lock className="w-3.5 h-3.5 text-amber-500" />
-            <span>Multi-Channel Remarks</span>
+            Bureaus / Remarks
           </button>
 
           {isAdmin && (
             <button
               onClick={() => setCurrentTab('rbac')}
-              className={`px-3 py-2 text-xs font-semibold rounded-md flex items-center space-x-1.5 transition whitespace-nowrap ${
+              className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
                 currentTab === 'rbac'
-                  ? 'bg-blue-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                  : 'text-white hover:bg-[#1a365d] border-transparent'
               }`}
             >
-              <Key className="w-3.5 h-3.5 text-indigo-400" />
-              <span>RBAC & Policy Studio</span>
+              RBAC & Policy Studio
             </button>
           )}
 
           <button
             onClick={() => setCurrentTab('audit')}
-            className={`px-3 py-2 text-xs font-semibold rounded-md flex items-center space-x-1.5 transition whitespace-nowrap ${
+            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
               currentTab === 'audit'
-                ? 'bg-blue-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                : 'text-white hover:bg-[#1a365d] border-transparent'
             }`}
           >
-            <Shield className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Immutable Audit Trail</span>
+            Audit Trail (SHA-256)
           </button>
 
           <button
             onClick={() => setCurrentTab('security-tests')}
-            className={`px-3 py-2 text-xs font-semibold rounded-md flex items-center space-x-1.5 transition whitespace-nowrap ${
+            className={`py-2.5 px-4 text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
               currentTab === 'security-tests'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                : 'text-white hover:bg-[#1a365d] border-transparent'
             }`}
           >
-            <Award className="w-3.5 h-3.5" />
-            <span>Mandatory Security Tests (9/9)</span>
+            Mandatory Security Tests (9/9)
           </button>
 
         </div>
+      </nav>
+
+      {/* 4. Official "LATEST NEWS" Ticker Bar (Image 3 & 4) */}
+      <div className="bg-[#fff9db] border-b border-amber-200 px-4 py-1.5 flex items-center space-x-3 text-xs overflow-hidden">
+        <div className="bg-[#f59e0b] text-slate-950 font-black text-[11px] px-2.5 py-0.5 rounded uppercase tracking-wider shrink-0 shadow-2xs">
+          LATEST NEWS
+        </div>
+        <div className="truncate text-slate-800 font-medium text-[11px]">
+          <span className="text-red-600 font-bold mr-1">*</span>
+          Extension of last date for submission of online applications under AICTE Approval Process 2026-27
+          <span className="ml-3 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">NEW</span>
+          <span className="mx-3 text-slate-400">|</span>
+          <span className="text-red-600 font-bold mr-1">*</span>
+          Mandatory Backend Document Visibility & RBAC Access Matrix Enforced for all Affiliated Technical Institutions
+        </div>
       </div>
+
     </header>
   );
 }

@@ -102,13 +102,13 @@ export default function DashboardOverview({ user, onNavigate }) {
     <div className="space-y-6">
       
       {/* Welcome Banner */}
-      <div className="bg-linear-to-r from-blue-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden border border-blue-800">
+      <div className="bg-linear-to-r from-[#122749] via-[#1a365d] to-[#0f172a] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden border border-blue-900">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         
         <div className="relative z-10">
-          <div className="inline-flex items-center space-x-2 bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-semibold mb-3 border border-amber-500/30">
+          <div className="inline-flex items-center space-x-2 bg-[#f59e0b] text-slate-950 px-3 py-1 rounded-full text-xs font-bold mb-3 shadow-2xs">
             <Shield className="w-3.5 h-3.5" />
-            <span>Authorised Session: {ROLE_LABELS[user.role] || user.role}</span>
+            <span>Official Authorised Session: {ROLE_LABELS[user.role] || user.role}</span>
           </div>
 
           <h2 className="text-xl md:text-2xl font-black tracking-tight text-white">
