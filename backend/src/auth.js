@@ -5,12 +5,15 @@ const { v4: uuidv4 } = require('uuid');
 const { db } = require('./db');
 const { ROLES } = require('./rbac');
 
-let JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is mandatory in production.');
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || typeof secret !== 'string' || secret.trim().length === 0) {
+    throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing. Authentication service refuses to operate without a configured secret.');
   }
-  JWT_SECRET = 'aicte-centralized-jwt-auth-secret-key-2026';
+  if (secret.trim().length < 32) {
+    throw new Error('FATAL SECURITY ERROR: JWT_SECRET must be at least 32 characters in length to ensure cryptographic collision and forgery resistance.');
+  }
+  return secret.trim();
 }
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -30,7 +33,7 @@ function generateAuthToken(user) {
       region: user.region,
       full_name: user.full_name
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '8h' }
   );
 }
@@ -49,7 +52,14 @@ function authenticateToken(req, res, next) {
     });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+  let secret;
+  try {
+    secret = getJwtSecret();
+  } catch (err) {
+    return res.status(500).json({ error: 'Server Security Configuration Error', message: err.message });
+  }
+
+  jwt.verify(token, secret, (err, decoded) => {
     if (err) {
       return res.status(403).json({ 
         error: 'Forbidden', 
@@ -78,12 +88,16 @@ function optionalAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (token) {
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
-      if (!err && decoded) {
-        req.user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id);
-      }
+    try {
+      jwt.verify(token, getJwtSecret(), (err, decoded) => {
+        if (!err && decoded) {
+          req.user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id);
+        }
+        next();
+      });
+    } catch (e) {
       next();
-    });
+    }
   } else {
     next();
   }
@@ -229,7 +243,7 @@ async function authenticateUser({ username, password, ipAddress = '127.0.0.1', u
 
     const mfaSessionToken = jwt.sign(
       { id: user.id, mfaPending: true },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '5m' }
     );
 
@@ -272,7 +286,7 @@ async function authenticateUser({ username, password, ipAddress = '127.0.0.1', u
  */
 function verifyMfa({ mfaSessionToken, code, ipAddress = '127.0.0.1', userAgent = 'AICTE-Client' }) {
   try {
-    const decoded = jwt.verify(mfaSessionToken, JWT_SECRET);
+    const decoded = jwt.verify(mfaSessionToken, getJwtSecret());
     if (!decoded.mfaPending || !decoded.id) {
       return { success: false, statusCode: 400, error: 'Invalid MFA session token.' };
     }
@@ -433,8 +447,9 @@ function sanitizeUser(user) {
   return safeUser;
 }
 
-module.exports = {
-  JWT_SECRET,
+const authModule = {
+  getJwtSecret,
+  validateJwtSecret: getJwtSecret,
   generateAuthToken,
   authenticateToken,
   optionalAuth,
@@ -446,3 +461,11 @@ module.exports = {
   initiatePasswordRecovery,
   completePasswordReset
 };
+
+Object.defineProperty(authModule, 'JWT_SECRET', {
+  get: () => getJwtSecret(),
+  enumerable: true,
+  configurable: true
+});
+
+module.exports = authModule;

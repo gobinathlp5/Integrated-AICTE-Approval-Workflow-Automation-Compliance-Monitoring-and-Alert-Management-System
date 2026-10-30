@@ -1,11 +1,14 @@
 const crypto = require('crypto');
 
-let SECRET_KEY = process.env.DOC_TOKEN_SECRET || process.env.TOKEN_SECRET;
-if (!SECRET_KEY) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('FATAL SECURITY ERROR: DOC_TOKEN_SECRET environment variable is mandatory in production.');
+function getDocTokenSecret() {
+  const secret = process.env.DOC_TOKEN_SECRET || process.env.TOKEN_SECRET;
+  if (!secret || typeof secret !== 'string' || secret.trim().length === 0) {
+    throw new Error('FATAL SECURITY ERROR: DOC_TOKEN_SECRET environment variable is missing. Document token service refuses to operate without a configured secret.');
   }
-  SECRET_KEY = 'aicte-secure-signing-key-2026-super-secret-salt';
+  if (secret.trim().length < 32) {
+    throw new Error('FATAL SECURITY ERROR: DOC_TOKEN_SECRET must be at least 32 characters in length to ensure cryptographic integrity.');
+  }
+  return secret.trim();
 }
 
 /**
@@ -15,9 +18,10 @@ if (!SECRET_KEY) {
  * @param {number} expiresInSeconds - Expiration window (default: 300s = 5 mins)
  */
 function generateSignedDocToken(documentId, userId, expiresInSeconds = 300) {
+  const secret = getDocTokenSecret();
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
   const payload = `${documentId}:${userId}:${expiresAt}`;
-  const signature = crypto.createHmac('sha256', SECRET_KEY).update(payload).digest('hex');
+  const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
   
   // Base64Url encode token
   const token = Buffer.from(JSON.stringify({ documentId, userId, expiresAt, signature })).toString('base64url');
@@ -46,8 +50,9 @@ function verifySignedDocToken(tokenString, expectedDocumentId = null) {
     }
 
     // Verify HMAC signature
+    const secret = getDocTokenSecret();
     const expectedPayload = `${documentId}:${userId}:${expiresAt}`;
-    const expectedSig = crypto.createHmac('sha256', SECRET_KEY).update(expectedPayload).digest('hex');
+    const expectedSig = crypto.createHmac('sha256', secret).update(expectedPayload).digest('hex');
 
     if (signature !== expectedSig) {
       return { isValid: false, reason: 'Invalid or forged token cryptographic signature' };

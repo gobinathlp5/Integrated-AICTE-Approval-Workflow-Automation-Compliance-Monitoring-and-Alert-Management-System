@@ -291,6 +291,12 @@ function initDb() {
       FOREIGN KEY (decision_maker_id) REFERENCES users(id)
     );
 
+    -- Order Number Sequences (Deterministic Atomic Sequence Generator)
+    CREATE TABLE IF NOT EXISTS order_number_sequences (
+      year INTEGER PRIMARY KEY,
+      current_val INTEGER NOT NULL
+    );
+
     -- Undertaking Templates
     CREATE TABLE IF NOT EXISTS undertaking_templates (
       id TEXT PRIMARY KEY,
@@ -668,7 +674,8 @@ function initDb() {
       { version: 6, name: 'Competent Authority Decisions and Undertakings' },
       { version: 7, name: 'Compliance Obligations, Notifications and Escalations' },
       { version: 8, name: 'Document Security, Audit Trail and Immutable Triggers' },
-      { version: 9, name: 'Cryptographic MFA, Account Recovery and Institutional Verification Lifecycle' }
+      { version: 9, name: 'Cryptographic MFA, Account Recovery and Institutional Verification Lifecycle' },
+      { version: 10, name: 'Deterministic Order Number Allocation Sequence and Workflow Guardrails' }
     ];
 
     const recordMigration = db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (?, ?)');

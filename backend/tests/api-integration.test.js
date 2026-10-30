@@ -1,3 +1,11 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'test_jwt_secret_token_government_grade_ci_2026';
+}
+if (!process.env.DOC_TOKEN_SECRET) {
+  process.env.DOC_TOKEN_SECRET = 'test_doc_token_secret_government_grade_ci_2026';
+}
 const http = require('http');
 const app = require('../src/server');
 const { db, initDb } = require('../src/db');
@@ -429,8 +437,22 @@ async function runApiIntegrationTests() {
     // 9. Competent Authority Decision: Non-CA blocked, Critical Deficiency Block, Statutory Approval
     {
       const testApp = db.prepare('SELECT * FROM applications LIMIT 1').get();
-      // Clear any prior open critical test deficiencies so test starts clean
-      db.prepare("UPDATE deficiencies SET status = 'RESOLVED' WHERE application_id = ? AND severity = 'CRITICAL'").run(testApp.id);
+      // Prepare clean state for testApp: clear prior decisions and unresolved deficiencies
+      db.prepare("DELETE FROM authority_decisions WHERE application_id = ?").run(testApp.id);
+      db.prepare("UPDATE applications SET status = 'UNDER_SCRUTINY', current_stage = 'UNDER_SCRUTINY' WHERE id = ?").run(testApp.id);
+      db.prepare("UPDATE documents SET verification_status = 'VERIFIED' WHERE application_id = ?").run(testApp.id);
+      db.prepare("UPDATE deficiencies SET status = 'RESOLVED' WHERE application_id = ?").run(testApp.id);
+
+      // Ensure scrutiny completed
+      const existingScrutiny = db.prepare("SELECT * FROM scrutiny_evaluations WHERE application_id = ?").get(testApp.id);
+      if (!existingScrutiny) {
+        db.prepare(`
+          INSERT INTO scrutiny_evaluations (id, application_id, officer_id, officer_name, status, checklist_json, recommendation)
+          VALUES ('scrutiny_test_01', ?, 'usr_scrutiny_01', 'Dr. Sharma', 'COMPLETED', '[]', 'APPROVE_FOR_NEXT')
+        `).run(testApp.id);
+      } else {
+        db.prepare("UPDATE scrutiny_evaluations SET status = 'COMPLETED', recommendation = 'APPROVE_FOR_NEXT' WHERE application_id = ?").run(testApp.id);
+      }
 
       // Scrutiny officer attempt to render decision -> 403
       const blockedRes = await fetch(`${baseUrl}/api/decisions/render`, {
@@ -442,7 +464,9 @@ async function runApiIntegrationTests() {
         body: JSON.stringify({
           applicationId: testApp.id,
           decision: 'APPROVED',
-          reasoning: 'Unauthorized decision attempt'
+          reasoning: 'Unauthorized decision attempt',
+          approvedIntake: 180,
+          validityYears: 3
         })
       });
       assert(
@@ -468,16 +492,16 @@ async function runApiIntegrationTests() {
         body: JSON.stringify({
           applicationId: testApp.id,
           decision: 'APPROVED',
-          reasoning: 'Approval with critical deficiency'
+          reasoning: 'Approval with critical deficiency',
+          approvedIntake: 180,
+          validityYears: 3
         })
       });
       const critBlockedData = await safeJson(critBlockedRes);
-      const isCritError = critBlockedData.error?.code === 'CRITICAL_DEFICIENCIES_EXIST' || 
-                          (typeof critBlockedData.error === 'string' && critBlockedData.error.toLowerCase().includes('critical')) ||
-                          (typeof critBlockedData.error?.message === 'string' && critBlockedData.error.message.toLowerCase().includes('critical'));
+      const isCritError = critBlockedRes.status === 400 && JSON.stringify(critBlockedData).toLowerCase().includes('critical');
 
       assert(
-        critBlockedRes.status === 400 && isCritError,
+        isCritError,
         'Statutory safety lock: Competent Authority cannot approve application with open CRITICAL deficiencies (HTTP 400)',
         { status: critBlockedRes.status, error: critBlockedData.error }
       );

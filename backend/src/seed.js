@@ -7,6 +7,10 @@ const { ROLES, VISIBILITY_CATEGORIES } = require('./rbac');
 const { recordDocumentAudit } = require('./audit');
 
 function seedDatabase() {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[SECURITY GUARDRAIL] Production environment detected: Database seeding with demo credentials is strictly prohibited.');
+    return;
+  }
   console.log('Seeding AICTE Digital Governance environment...');
 
   const defaultPasswordHash = bcrypt.hashSync('Password@123', 10);

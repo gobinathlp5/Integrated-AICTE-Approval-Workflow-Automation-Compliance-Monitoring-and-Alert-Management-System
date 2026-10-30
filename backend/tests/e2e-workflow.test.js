@@ -1,3 +1,11 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'test_jwt_secret_token_government_grade_ci_2026';
+}
+if (!process.env.DOC_TOKEN_SECRET) {
+  process.env.DOC_TOKEN_SECRET = 'test_doc_token_secret_government_grade_ci_2026';
+}
 const http = require('http');
 const app = require('../src/server');
 const { db, initDb } = require('../src/db');

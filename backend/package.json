@@ -7,7 +7,11 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node src/seed.js",
-    "test": "node tests/security.test.js && node tests/api-integration.test.js && node tests/e2e-workflow.test.js"
+    "test:security": "node tests/security.test.js",
+    "test:api": "node tests/api-integration.test.js",
+    "test:workflow": "node tests/e2e-workflow.test.js",
+    "test:safeguards": "node tests/safeguards.test.js",
+    "test": "node tests/security.test.js && node tests/api-integration.test.js && node tests/e2e-workflow.test.js && node tests/safeguards.test.js"
   },
   "keywords": [],
   "author": "",
