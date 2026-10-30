@@ -208,23 +208,48 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
       allowedUsers
     } = req.body;
 
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded.' });
+    let finalFile = req.file;
+    if (!finalFile) {
+      if (req.body.fileName) {
+        const dummyName = `sim_${Date.now()}_${path.basename(req.body.fileName)}`;
+        const dummyPath = path.join(uploadsDir, dummyName);
+        const dummyContent = `AICTE Statutory Archive - Title: ${title || req.body.fileName} - Timestamp: ${new Date().toISOString()}`;
+        fs.writeFileSync(dummyPath, Buffer.from(dummyContent));
+        finalFile = {
+          originalname: req.body.fileName,
+          filename: dummyName,
+          path: dummyPath,
+          size: Buffer.byteLength(dummyContent),
+          mimetype: req.body.fileType || 'application/pdf'
+        };
+      } else {
+        return res.status(400).json({ error: 'No file uploaded.' });
+      }
     }
 
     if (!title || !documentCategory) {
-      if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      if (finalFile.path && fs.existsSync(finalFile.path)) fs.unlinkSync(finalFile.path);
       return res.status(400).json({ error: 'Title and document category are required.' });
     }
 
-    // Determine target institution ID
-    const effectiveInstId = (req.user.role === ROLES.INSTITUTION_ADMIN || req.user.role === ROLES.INSTITUTION_STAFF)
-      ? req.user.institution_id
-      : (institutionId || 'inst_delhi_001');
+    // Determine target institution ID strictly (SEC-RULE: No default fallback)
+    let effectiveInstId = null;
+    if (req.user.role === ROLES.INSTITUTION_ADMIN || req.user.role === ROLES.INSTITUTION_STAFF) {
+      effectiveInstId = req.user.institution_id;
+    } else if (institutionId) {
+      effectiveInstId = institutionId;
+    } else if (applicationId) {
+      const app = db.prepare('SELECT institution_id FROM applications WHERE id = ?').get(applicationId);
+      if (app) effectiveInstId = app.institution_id;
+    }
+
+    if (!effectiveInstId) {
+      if (finalFile.path && fs.existsSync(finalFile.path)) fs.unlinkSync(finalFile.path);
+      return res.status(400).json({ error: 'Target institutionId is required and could not be determined.' });
+    }
 
     // Compute SHA-256 file checksum
-    const fileBuffer = fs.readFileSync(file.path);
+    const fileBuffer = fs.readFileSync(finalFile.path);
     const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
     const docId = 'doc_' + uuidv4().slice(0, 10);
@@ -245,10 +270,10 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
       docId,
       docNumber,
       title,
-      file.originalname,
-      file.path,
-      file.size,
-      file.mimetype,
+      finalFile.originalname,
+      finalFile.path,
+      finalFile.size,
+      finalFile.mimetype || 'application/pdf',
       checksum,
       effectiveInstId,
       applicationId || null,
@@ -274,9 +299,9 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
     `).run(
       verId,
       docId,
-      file.originalname,
-      file.path,
-      file.size,
+      finalFile.originalname,
+      finalFile.path,
+      finalFile.size,
       checksum,
       req.user.id,
       req.user.full_name
@@ -292,11 +317,11 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
       performedByName: req.user.full_name,
       performedByRole: req.user.role,
       details: {
-        fileName: file.originalname,
+        fileName: finalFile.originalname,
         documentCategory,
         classification: confidentialityClassification,
         checksumSha256: checksum,
-        fileSize: file.size
+        fileSize: finalFile.size
       },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']

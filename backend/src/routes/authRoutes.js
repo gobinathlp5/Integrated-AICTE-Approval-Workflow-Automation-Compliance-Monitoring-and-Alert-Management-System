@@ -175,6 +175,12 @@ router.get('/me', authenticateToken, (req, res) => {
  * Demo helper to easily switch between all 13 user roles for hackathon review/testing
  */
 router.post('/quick-switch', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Quick demo role switching is strictly disabled in production environments.'
+    });
+  }
   const { role, username } = req.body;
   let user;
 

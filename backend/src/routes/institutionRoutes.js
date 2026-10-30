@@ -5,6 +5,32 @@ const { db } = require('../db');
 const { ROLES } = require('../rbac');
 const { authenticateToken } = require('../auth');
 const { createNotification } = require('../notificationService');
+const { successResponse, errorResponse } = require('../utils/responseHelper');
+
+/**
+ * GET /api/institutions/search/pid/:aicteId
+ * Lookup institution by Permanent AICTE ID (PID)
+ */
+router.get('/search/pid/:aicteId', authenticateToken, (req, res) => {
+  const { aicteId } = req.params;
+  const inst = db.prepare('SELECT * FROM institutions WHERE aicte_id = ? OR code = ?').get(aicteId, aicteId);
+
+  if (!inst) {
+    return errorResponse(res, `No institution found with Permanent ID: ${aicteId}`, 404, 'NOT_FOUND');
+  }
+
+  // Tenant isolation: Institution users can only view their own PID record
+  if (req.user.role === ROLES.INSTITUTION_ADMIN || req.user.role === ROLES.INSTITUTION_STAFF) {
+    if (req.user.institution_id !== inst.id) {
+      return errorResponse(res, 'Access Denied: You cannot inspect another institution PID record.', 403, 'FORBIDDEN');
+    }
+  }
+
+  return successResponse(res, {
+    ...inst,
+    programmes: inst.programmes_offered ? (typeof inst.programmes_offered === 'string' ? JSON.parse(inst.programmes_offered) : inst.programmes_offered) : []
+  }, 'Institution located');
+});
 
 /**
  * GET /api/institutions
@@ -25,7 +51,7 @@ router.get('/', authenticateToken, (req, res) => {
     params.push(region);
   }
 
-  // Institution tenant isolation: institution users only see their own institution
+  // Institution tenant isolation
   if (req.user.role === ROLES.INSTITUTION_ADMIN || req.user.role === ROLES.INSTITUTION_STAFF) {
     query += ' AND id = ?';
     params.push(req.user.institution_id);
@@ -42,21 +68,15 @@ router.get('/', authenticateToken, (req, res) => {
   }
 
   if (search) {
-    query += ' AND (name LIKE ? OR code LIKE ? OR city LIKE ?)';
+    query += ' AND (name LIKE ? OR code LIKE ? OR aicte_id LIKE ? OR city LIKE ?)';
     const term = `%${search}%`;
-    params.push(term, term, term);
+    params.push(term, term, term, term);
   }
 
   query += ' ORDER BY name ASC';
   const institutions = db.prepare(query).all(...params);
 
-  return res.json({
-    total: institutions.length,
-    institutions: institutions.map(i => ({
-      ...i,
-      programmes: i.programmes_json ? JSON.parse(i.programmes_json) : []
-    }))
-  });
+  return successResponse(res, institutions, 'Institutions retrieved');
 });
 
 /**
@@ -67,13 +87,13 @@ router.get('/:id', authenticateToken, (req, res) => {
   // Tenant check for institution users
   if (req.user.role === ROLES.INSTITUTION_ADMIN || req.user.role === ROLES.INSTITUTION_STAFF) {
     if (req.user.institution_id !== req.params.id) {
-      return res.status(403).json({ error: 'Access Denied: Cross-institution profile inspection forbidden.' });
+      return errorResponse(res, 'Access Denied: Cross-institution profile inspection forbidden.', 403, 'FORBIDDEN');
     }
   }
 
   const inst = db.prepare('SELECT * FROM institutions WHERE id = ?').get(req.params.id);
   if (!inst) {
-    return res.status(404).json({ error: 'Institution not found' });
+    return errorResponse(res, 'Institution not found', 404, 'NOT_FOUND');
   }
 
   const applications = db.prepare('SELECT * FROM applications WHERE institution_id = ? ORDER BY academic_year DESC').all(inst.id);
@@ -82,17 +102,31 @@ router.get('/:id', authenticateToken, (req, res) => {
   const obligations = db.prepare('SELECT * FROM compliance_obligations WHERE institution_id = ?').all(inst.id);
   const users = db.prepare('SELECT id, username, email, full_name, role, is_active, designation FROM users WHERE institution_id = ?').all(inst.id);
 
-  return res.json({
+  let parsedProgrammes = [];
+  const rawProg = inst.programmes_offered || inst.programmes_json;
+  if (rawProg) {
+    try {
+      parsedProgrammes = typeof rawProg === 'string' ? JSON.parse(rawProg) : rawProg;
+    } catch (e) {
+      parsedProgrammes = [];
+    }
+  }
+
+  const result = {
+    ...inst,
     institution: {
       ...inst,
-      programmes: inst.programmes_json ? JSON.parse(inst.programmes_json) : []
+      programmes: parsedProgrammes
     },
+    programmes_offered: parsedProgrammes,
     applications,
     documentsCount: documents.length,
     undertakingsCount: undertakings.length,
     obligations,
     authorizedUsers: users
-  });
+  };
+
+  return successResponse(res, result, 'Institution profile retrieved');
 });
 
 /**
@@ -100,14 +134,13 @@ router.get('/:id', authenticateToken, (req, res) => {
  * Update institution profile details
  */
 router.put('/:id', authenticateToken, (req, res) => {
-  // Check authorization
   if (req.user.role === ROLES.INSTITUTION_ADMIN && req.user.institution_id !== req.params.id) {
-    return res.status(403).json({ error: 'Cannot update other institutions.' });
+    return errorResponse(res, 'Cannot update other institutions.', 403, 'FORBIDDEN');
   }
 
   const {
-    name, contactEmail, contactPhone, hoiName, hoiDesignation,
-    address, district, pincode, establishmentYear, programmes
+    name, contact_person, contact_email, phone, contactPhone, hoi_name, hoiName,
+    address, district, pincode, establishmentYear, programmes, land_area_acres, built_up_area_sqm
   } = req.body;
 
   const progStr = programmes ? (typeof programmes === 'string' ? programmes : JSON.stringify(programmes)) : null;
@@ -115,38 +148,47 @@ router.put('/:id', authenticateToken, (req, res) => {
   db.prepare(`
     UPDATE institutions SET
       name = COALESCE(?, name),
+      contact_person = COALESCE(?, contact_person),
       contact_email = COALESCE(?, contact_email),
-      contact_phone = COALESCE(?, contact_phone),
-      hoi_name = COALESCE(?, hoi_name),
-      hoi_designation = COALESCE(?, hoi_designation),
+      phone = COALESCE(?, ? , phone),
+      hoi_name = COALESCE(?, ?, hoi_name),
       address = COALESCE(?, address),
       district = COALESCE(?, district),
       pincode = COALESCE(?, pincode),
       establishment_year = COALESCE(?, establishment_year),
-      programmes_json = COALESCE(?, programmes_json)
+      programmes_offered = COALESCE(?, programmes_offered),
+      land_area_acres = COALESCE(?, land_area_acres),
+      built_up_area_sqm = COALESCE(?, built_up_area_sqm)
     WHERE id = ?
-  `).run(name, contactEmail, contactPhone, hoiName, hoiDesignation, address, district, pincode, establishmentYear, progStr, req.params.id);
+  `).run(
+    name, contact_person, contact_email,
+    phone, contactPhone,
+    hoi_name, hoiName,
+    address, district, pincode, establishmentYear, progStr,
+    land_area_acres, built_up_area_sqm,
+    req.params.id
+  );
 
-  return res.json({ success: true, message: 'Institutional profile updated.' });
+  return successResponse(res, { institutionId: req.params.id }, 'Institutional profile updated.');
 });
 
 /**
  * POST /api/institutions/:id/verify
- * Regional Officer or Admin verifies new institution registration
  */
 router.post('/:id/verify', authenticateToken, (req, res) => {
   const canVerify = [ROLES.SUPER_ADMIN, ROLES.AICTE_ADMIN, ROLES.REGIONAL_OFFICER].includes(req.user.role);
   if (!canVerify) {
-    return res.status(403).json({ error: 'Permission Denied: Regional Officer or Admin authority required.' });
+    return errorResponse(res, 'Permission Denied: Regional Officer or Admin authority required.', 403, 'FORBIDDEN');
   }
 
   db.prepare(`
     UPDATE institutions SET
       status = 'ACTIVE',
-      verified_by_officer_id = ?,
+      verified = 1,
+      verified_by = ?,
       verified_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(req.user.id, req.params.id);
+  `).run(req.user.full_name, req.params.id);
 
   createNotification({
     institutionId: req.params.id,
@@ -156,7 +198,7 @@ router.post('/:id/verify', authenticateToken, (req, res) => {
     link: '/dashboard'
   });
 
-  return res.json({ success: true, message: 'Institution verified and activated.' });
+  return successResponse(res, { institutionId: req.params.id, status: 'ACTIVE' }, 'Institution verified and activated.');
 });
 
 module.exports = router;

@@ -45,6 +45,7 @@ function initDb() {
     CREATE TABLE IF NOT EXISTS institutions (
       id TEXT PRIMARY KEY,
       code TEXT UNIQUE NOT NULL,
+      aicte_id TEXT,
       name TEXT NOT NULL,
       type TEXT NOT NULL, -- Engineering, Management, Pharmacy, Architecture, etc.
       region TEXT NOT NULL, -- Northern, Western, Southern, Eastern, Central, South-Western, etc.
@@ -55,12 +56,19 @@ function initDb() {
       address TEXT,
       contact_email TEXT,
       contact_phone TEXT,
+      contact_person TEXT,
+      phone TEXT,
       hoi_name TEXT,
       hoi_designation TEXT,
       establishment_year INTEGER,
+      land_area_acres REAL,
+      built_up_area_sqm REAL,
+      programmes_offered TEXT,
       programmes_json TEXT,
       compliance_score REAL DEFAULT 85.0,
       status TEXT DEFAULT 'ACTIVE', -- ACTIVE, PENDING_VERIFICATION, SUSPENDED
+      verified INTEGER DEFAULT 1,
+      verified_by TEXT,
       verified_by_officer_id TEXT,
       verified_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -146,6 +154,9 @@ function initDb() {
       description TEXT NOT NULL,
       severity TEXT DEFAULT 'MAJOR', -- CRITICAL, MAJOR, MINOR
       status TEXT DEFAULT 'OPEN', -- OPEN, RESOLVED, WAIVED
+      statutory_clause TEXT,
+      remedy_instructions TEXT,
+      deadline_days INTEGER DEFAULT 15,
       institution_response TEXT,
       response_document_id TEXT,
       resolved_at DATETIME,
@@ -185,9 +196,16 @@ function initDb() {
       application_id TEXT NOT NULL,
       scheduled_date DATE NOT NULL,
       status TEXT DEFAULT 'SCHEDULED', -- SCHEDULED, RESCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+      inspection_type TEXT DEFAULT 'REGULAR',
+      committee_leader_id TEXT,
       agenda TEXT,
       checklist_json TEXT, -- Physical infrastructure, safety, computing, workshops
       findings TEXT,
+      findings_summary TEXT,
+      outcome TEXT,
+      infrastructure_satisfactory INTEGER DEFAULT 1,
+      faculty_satisfactory INTEGER DEFAULT 1,
+      deficiency_found INTEGER DEFAULT 0,
       recommendation TEXT, -- RECOMMENDED_APPROVAL, RECOMMENDED_REJECTION, RE_INSPECT
       report_file_id TEXT,
       completed_at DATETIME,
@@ -202,10 +220,15 @@ function initDb() {
       inspection_id TEXT NOT NULL,
       evidence_type TEXT NOT NULL, -- PHOTO, VIDEO, DOCUMENT
       title TEXT NOT NULL,
+      file_title TEXT,
       geo_lat REAL,
       geo_lng REAL,
+      latitude REAL,
+      longitude REAL,
+      remarks TEXT,
       file_path TEXT NOT NULL,
       uploader_id TEXT NOT NULL,
+      uploaded_by_user_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (inspection_id) REFERENCES evc_inspections(id)
     );
@@ -226,9 +249,14 @@ function initDb() {
       committee_id TEXT NOT NULL,
       application_id TEXT NOT NULL,
       scheduled_at DATETIME NOT NULL,
+      meeting_mode TEXT DEFAULT 'VIRTUAL',
+      committee_chair TEXT,
+      committee_members TEXT,
       appellant_name TEXT,
       hearing_summary TEXT,
       observations TEXT,
+      reasoning TEXT,
+      condition_notes TEXT,
       recommendation TEXT, -- APPROVE_GRANT, REJECT_GRANT, REMAND_TO_EVC
       status TEXT DEFAULT 'SCHEDULED', -- SCHEDULED, COMPLETED, ADJOURNED
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -242,9 +270,16 @@ function initDb() {
       application_id TEXT NOT NULL,
       decision_maker_id TEXT NOT NULL,
       decision_maker_name TEXT NOT NULL,
+      authority_user_id TEXT,
+      authority_name TEXT,
+      authority_role TEXT,
       decision TEXT NOT NULL, -- APPROVED, REJECTED
       order_number TEXT UNIQUE NOT NULL,
+      formal_order_number TEXT,
       order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      approved_intake INTEGER,
+      validity_years INTEGER DEFAULT 1,
+      reasoning TEXT,
       remarks TEXT,
       conditions TEXT,
       previous_status TEXT,
@@ -279,8 +314,11 @@ function initDb() {
       document_id TEXT,
       valid_from DATE,
       valid_until DATE,
+      validity_date DATE,
+      remarks TEXT,
       verification_remarks TEXT,
       verified_by TEXT,
+      verified_by_user_id TEXT,
       verified_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (template_id) REFERENCES undertaking_templates(id),
@@ -294,10 +332,14 @@ function initDb() {
       application_id TEXT,
       title TEXT NOT NULL,
       category TEXT NOT NULL, -- ACADEMIC, INFRASTRUCTURE, FACULTY, FINANCIAL, REGULATORY
+      obligation_category TEXT,
+      academic_year TEXT,
       description TEXT,
       due_date DATE NOT NULL,
       status TEXT DEFAULT 'PENDING', -- PENDING, SUBMITTED, VERIFIED, OVERDUE, NON_COMPLIANT
       evidence_doc_id TEXT,
+      evidence_notes TEXT,
+      submitted_at DATETIME,
       penalty_clause TEXT,
       compliance_score REAL DEFAULT 100.0,
       verified_by TEXT,
@@ -489,66 +531,117 @@ function initDb() {
 
   // Safely check and add any missing columns in existing tables
   try {
-    const appCols = db.prepare("PRAGMA table_info(applications)").all().map(c => c.name);
-    if (!appCols.includes('current_stage')) {
-      db.prepare("ALTER TABLE applications ADD COLUMN current_stage TEXT DEFAULT 'SUBMITTED'").run();
-    }
-    if (!appCols.includes('workflow_template_id')) {
-      db.prepare("ALTER TABLE applications ADD COLUMN workflow_template_id TEXT").run();
-    }
-    if (!appCols.includes('is_on_hold')) {
-      db.prepare("ALTER TABLE applications ADD COLUMN is_on_hold INTEGER DEFAULT 0").run();
-    }
-    if (!appCols.includes('hold_reason')) {
-      db.prepare("ALTER TABLE applications ADD COLUMN hold_reason TEXT").run();
-    }
-    if (!appCols.includes('hold_by')) {
-      db.prepare("ALTER TABLE applications ADD COLUMN hold_by TEXT").run();
-    }
-    if (!appCols.includes('hold_at')) {
-      db.prepare("ALTER TABLE applications ADD COLUMN hold_at DATETIME").run();
-    }
-    if (!appCols.includes('programmes_requested')) {
-      db.prepare("ALTER TABLE applications ADD COLUMN programmes_requested TEXT").run();
-    }
+    const ensureColumns = (tableName, columnMap) => {
+      try {
+        const existing = db.prepare(`PRAGMA table_info(${tableName})`).all().map(c => c.name);
+        for (const [colName, colType] of Object.entries(columnMap)) {
+          if (!existing.includes(colName)) {
+            db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${colName} ${colType}`).run();
+          }
+        }
+      } catch (e) {
+        console.warn(`Column check failed for ${tableName}:`, e.message);
+      }
+    };
 
-    const instCols = db.prepare("PRAGMA table_info(institutions)").all().map(c => c.name);
-    if (!instCols.includes('district')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN district TEXT").run();
-    }
-    if (!instCols.includes('pincode')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN pincode TEXT").run();
-    }
-    if (!instCols.includes('address')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN address TEXT").run();
-    }
-    if (!instCols.includes('contact_email')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN contact_email TEXT").run();
-    }
-    if (!instCols.includes('contact_phone')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN contact_phone TEXT").run();
-    }
-    if (!instCols.includes('hoi_name')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN hoi_name TEXT").run();
-    }
-    if (!instCols.includes('hoi_designation')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN hoi_designation TEXT").run();
-    }
-    if (!instCols.includes('establishment_year')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN establishment_year INTEGER").run();
-    }
-    if (!instCols.includes('programmes_json')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN programmes_json TEXT").run();
-    }
-    if (!instCols.includes('compliance_score')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN compliance_score REAL DEFAULT 85.0").run();
-    }
-    if (!instCols.includes('verified_by_officer_id')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN verified_by_officer_id TEXT").run();
-    }
-    if (!instCols.includes('verified_at')) {
-      db.prepare("ALTER TABLE institutions ADD COLUMN verified_at DATETIME").run();
-    }
+    ensureColumns('applications', {
+      current_stage: "TEXT DEFAULT 'SUBMITTED'",
+      workflow_template_id: "TEXT",
+      is_on_hold: "INTEGER DEFAULT 0",
+      hold_reason: "TEXT",
+      hold_by: "TEXT",
+      hold_at: "DATETIME",
+      programmes_requested: "TEXT"
+    });
+
+    ensureColumns('institutions', {
+      aicte_id: "TEXT",
+      district: "TEXT",
+      pincode: "TEXT",
+      address: "TEXT",
+      contact_email: "TEXT",
+      contact_phone: "TEXT",
+      contact_person: "TEXT",
+      phone: "TEXT",
+      hoi_name: "TEXT",
+      hoi_designation: "TEXT",
+      establishment_year: "INTEGER",
+      land_area_acres: "REAL",
+      built_up_area_sqm: "REAL",
+      programmes_offered: "TEXT",
+      programmes_json: "TEXT",
+      compliance_score: "REAL DEFAULT 85.0",
+      verified: "INTEGER DEFAULT 1",
+      verified_by: "TEXT",
+      verified_by_officer_id: "TEXT",
+      verified_at: "DATETIME"
+    });
+
+    ensureColumns('deficiencies', {
+      statutory_clause: "TEXT",
+      remedy_instructions: "TEXT",
+      deadline_days: "INTEGER DEFAULT 15"
+    });
+
+    ensureColumns('evc_committees', {
+      region: "TEXT",
+      coordinator_id: "TEXT"
+    });
+
+    ensureColumns('evc_committee_members', {
+      member_role: "TEXT DEFAULT 'MEMBER'",
+      role_in_committee: "TEXT"
+    });
+
+    ensureColumns('evc_inspections', {
+      inspection_type: "TEXT DEFAULT 'REGULAR'",
+      committee_leader_id: "TEXT",
+      findings_summary: "TEXT",
+      outcome: "TEXT",
+      infrastructure_satisfactory: "INTEGER DEFAULT 1",
+      faculty_satisfactory: "INTEGER DEFAULT 1",
+      deficiency_found: "INTEGER DEFAULT 0"
+    });
+
+    ensureColumns('evc_evidence', {
+      file_title: "TEXT",
+      latitude: "REAL",
+      longitude: "REAL",
+      remarks: "TEXT",
+      uploaded_by_user_id: "TEXT"
+    });
+
+    ensureColumns('sac_hearings', {
+      meeting_mode: "TEXT DEFAULT 'VIRTUAL'",
+      committee_chair: "TEXT",
+      committee_members: "TEXT",
+      reasoning: "TEXT",
+      condition_notes: "TEXT"
+    });
+
+    ensureColumns('authority_decisions', {
+      authority_user_id: "TEXT",
+      authority_name: "TEXT",
+      authority_role: "TEXT",
+      formal_order_number: "TEXT",
+      approved_intake: "INTEGER",
+      validity_years: "INTEGER DEFAULT 1",
+      reasoning: "TEXT"
+    });
+
+    ensureColumns('undertakings', {
+      validity_date: "DATE",
+      remarks: "TEXT",
+      verification_remarks: "TEXT",
+      verified_by_user_id: "TEXT"
+    });
+
+    ensureColumns('compliance_obligations', {
+      obligation_category: "TEXT",
+      academic_year: "TEXT",
+      evidence_notes: "TEXT",
+      submitted_at: "DATETIME"
+    });
   } catch (err) {
     console.warn('Column migration check notice:', err.message);
   }

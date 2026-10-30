@@ -34,8 +34,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static uploaded files (note: protected downloads should use /api/documents/:id/download)
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// SEC-RULE: Public static serving of private uploads is strictly denied.
+// All document access must pass through authorized endpoints (/api/documents/:id/download or /preview).
+app.use('/uploads', (req, res) => {
+  res.status(403).json({
+    success: false,
+    error: {
+      code: 'DIRECT_ACCESS_FORBIDDEN',
+      message: 'Direct access to document repository storage is forbidden. Use authorized API download links.'
+    }
+  });
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

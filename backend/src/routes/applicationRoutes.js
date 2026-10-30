@@ -60,6 +60,75 @@ router.get('/', authenticateToken, (req, res) => {
 });
 
 /**
+ * POST /api/applications
+ * Create new approval application
+ */
+router.post('/', authenticateToken, (req, res) => {
+  const {
+    institutionId,
+    academicYear = '2026-27',
+    applicationType = 'EXTENSION_OF_APPROVAL',
+    region,
+    programmesRequested,
+    remarks
+  } = req.body;
+
+  let effectiveInstId;
+  if (req.user.role === ROLES.INSTITUTION_ADMIN || req.user.role === ROLES.INSTITUTION_STAFF) {
+    effectiveInstId = req.user.institution_id;
+  } else {
+    effectiveInstId = institutionId || req.user.institution_id;
+  }
+
+  if (!effectiveInstId) {
+    return res.status(400).json({ error: 'Institution ID could not be established.' });
+  }
+
+  const inst = db.prepare('SELECT * FROM institutions WHERE id = ?').get(effectiveInstId);
+  if (!inst) {
+    return res.status(404).json({ error: 'Institution not found.' });
+  }
+
+  const appId = 'app_' + uuidv4().slice(0, 10);
+  const appNumber = `AICTE-${academicYear}-${inst.code || Math.floor(100000 + Math.random() * 900000)}`;
+  const finalRegion = region || inst.region || req.user.region || 'Northern';
+  const programmesStr = typeof programmesRequested === 'object' ? JSON.stringify(programmesRequested) : (programmesRequested || '[]');
+
+  db.prepare(`
+    INSERT INTO applications (
+      id, application_number, institution_id, academic_year, application_type,
+      status, current_stage, region, remarks, programmes_requested, submission_date
+    ) VALUES (?, ?, ?, ?, ?, 'SUBMITTED', 'SUBMITTED', ?, ?, ?, CURRENT_TIMESTAMP)
+  `).run(
+    appId,
+    appNumber,
+    effectiveInstId,
+    academicYear,
+    applicationType,
+    finalRegion,
+    remarks || 'New Application Submission',
+    programmesStr
+  );
+
+  // Record initial workflow history
+  db.prepare(`
+    INSERT INTO application_workflow_history (
+      id, application_id, from_stage, to_stage, transitioned_by, transitioned_by_role, remarks
+    ) VALUES (?, ?, 'DRAFT', 'SUBMITTED', ?, ?, 'Initial statutory dossier submitted')
+  `).run('wfh_' + uuidv4().slice(0, 10), appId, req.user.full_name, req.user.role);
+
+  const newApp = db.prepare('SELECT * FROM applications WHERE id = ?').get(appId);
+
+  return res.status(201).json({
+    success: true,
+    message: 'Application successfully created and submitted to Regulation Bureau.',
+    data: newApp,
+    applicationId: appId,
+    applicationNumber: appNumber
+  });
+});
+
+/**
  * GET /api/applications/:id
  * Retrieve single application details with documents and committee info
  */
@@ -142,13 +211,13 @@ router.post('/:id/assign', authenticateToken, (req, res) => {
 /**
  * POST /api/applications/:id/decision
  * Competent Authority approves or rejects application
- * STRICT RBAC CHECK: only authorized competent authorities!
+ * STRICT STATUTORY CHECK: Only authorized Competent Authority, subject to workflow prerequisites!
  */
 router.post('/:id/decision', authenticateToken, (req, res) => {
-  if (!hasPermission(req.user, PERMISSIONS.APPROVE_REJECT)) {
+  if (req.user.role !== ROLES.COMPETENT_AUTHORITY) {
     return res.status(403).json({
-      error: 'Permission Denied',
-      message: 'Decision approval / rejection is strictly restricted to authorized Competent Authorities.'
+      error: 'Statutory Privilege Violation',
+      message: 'Decision approval / rejection is strictly restricted to the authorized Competent Authority under Section 10(k) of the AICTE Act. Administrative roles cannot bypass statutory requirements.'
     });
   }
 
@@ -157,19 +226,51 @@ router.post('/:id/decision', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Decision must be either APPROVED or REJECTED.' });
   }
 
-  db.prepare(`
-    UPDATE applications SET
-      status = ?,
-      approval_date = CURRENT_TIMESTAMP,
-      remarks = COALESCE(?, remarks),
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(decision, remarks || null, req.params.id);
+  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(req.params.id);
+  if (!app) {
+    return res.status(404).json({ error: 'Application not found' });
+  }
+
+  // Prerequisite check: ensure no unresolved critical deficiencies
+  const openDef = db.prepare(`
+    SELECT count(*) as count FROM deficiencies 
+    WHERE application_id = ? AND status = 'OPEN' AND severity = 'CRITICAL'
+  `).get(app.id);
+
+  if (openDef && openDef.count > 0) {
+    return res.status(400).json({
+      error: 'Unresolved Deficiencies Exist',
+      message: `Cannot issue statutory decision while ${openDef.count} critical deficiencies remain open.`
+    });
+  }
+
+  const decisionId = 'dec_' + uuidv4().slice(0, 10);
+  const orderNumber = `AICTE/ORDER/${new Date().getFullYear()}/${Math.floor(100000 + Math.random() * 900000)}`;
+
+  db.transaction(() => {
+    db.prepare(`
+      INSERT INTO authority_decisions (
+        id, application_id, authority_user_id, authority_name, authority_role,
+        decision, formal_order_number, approved_intake, validity_years, reasoning
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 180, 3, ?)
+    `).run(decisionId, app.id, req.user.id, req.user.full_name, req.user.role, decision, orderNumber, remarks || 'Statutory determination recorded.');
+
+    db.prepare(`
+      UPDATE applications SET
+        status = ?,
+        current_stage = ?,
+        approval_date = CURRENT_TIMESTAMP,
+        remarks = COALESCE(?, remarks),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(decision, decision, remarks || null, app.id);
+  })();
 
   return res.json({
     success: true,
-    message: `Application has been formally [${decision}] by Competent Authority ${req.user.full_name}.`,
-    status: decision
+    message: `Application has been formally [${decision}] by Competent Authority ${req.user.full_name}. Order: ${orderNumber}`,
+    status: decision,
+    orderNumber
   });
 });
 

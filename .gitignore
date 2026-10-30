@@ -4,3 +4,4 @@ dist/
 .DS_Store
 backend/data/*.db-shm
 backend/data/*.db-wal
+backend/uploads/sim_*

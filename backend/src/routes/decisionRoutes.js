@@ -6,24 +6,40 @@ const { ROLES } = require('../rbac');
 const { authenticateToken } = require('../auth');
 const { createNotification } = require('../notificationService');
 const { recordDocumentAudit } = require('../audit');
+const { successResponse, errorResponse } = require('../utils/responseHelper');
 
 /**
- * GET /api/decisions/:applicationId
- * Get decision history & verification prerequisites for an application
+ * GET /api/decisions/pending
+ * List applications awaiting statutory consideration
  */
-router.get('/:applicationId', authenticateToken, (req, res) => {
+router.get('/pending', authenticateToken, (req, res) => {
+  const pendingApps = db.prepare(`
+    SELECT a.*, i.name as institution_name, i.region, i.aicte_id
+    FROM applications a
+    JOIN institutions i ON a.institution_id = i.id
+    WHERE a.status NOT IN ('APPROVED', 'REJECTED')
+    ORDER BY a.created_at DESC
+  `).all();
+
+  return successResponse(res, { pendingApplications: pendingApps }, 'Pending decision cases retrieved');
+});
+
+/**
+ * GET /api/decisions/:applicationId or /api/decisions/application/:applicationId
+ */
+function handleGetDecision(req, res) {
+  const applicationId = req.params.applicationId;
   const decision = db.prepare(`
     SELECT * FROM authority_decisions 
     WHERE application_id = ? 
     ORDER BY created_at DESC LIMIT 1
-  `).get(req.params.applicationId);
+  `).get(applicationId);
 
-  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(req.params.applicationId);
+  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(applicationId);
   if (!app) {
-    return res.status(404).json({ error: 'Application not found' });
+    return errorResponse(res, 'Application not found', 404, 'NOT_FOUND');
   }
 
-  // Evaluate prerequisites checklist
   const openDeficiencies = db.prepare(`
     SELECT count(*) as count FROM deficiencies 
     WHERE application_id = ? AND status = 'OPEN'
@@ -35,7 +51,7 @@ router.get('/:applicationId', authenticateToken, (req, res) => {
   `).get(app.id);
 
   const evc = db.prepare(`
-    SELECT status, recommendation FROM evc_inspections 
+    SELECT status, outcome, recommendation FROM evc_inspections 
     WHERE application_id = ? ORDER BY created_at DESC LIMIT 1
   `).get(app.id);
 
@@ -45,42 +61,55 @@ router.get('/:applicationId', authenticateToken, (req, res) => {
   `).get(app.id);
 
   const prerequisites = {
-    scrutinyCompleted: scrutiny ? (scrutiny.status === 'COMPLETED' || scrutiny.recommendation === 'APPROVE_FOR_NEXT') : false,
-    evcCompleted: evc ? (evc.status === 'COMPLETED') : (app.status === 'UNDER_SAC' || app.status === 'APPROVED'),
-    sacReviewed: sac ? sac.status === 'COMPLETED' : true,
+    scrutinyCompleted: scrutiny ? (scrutiny.status === 'COMPLETED' || scrutiny.recommendation === 'APPROVE_FOR_NEXT' || scrutiny.recommendation === 'RECOMMENDED_FOR_EVC') : false,
+    evcCompleted: evc ? (evc.status === 'COMPLETED' || evc.outcome === 'RECOMMENDED') : (app.status === 'UNDER_SAC' || app.status === 'APPROVED'),
+    sacReviewed: sac ? sac.status === 'COMPLETED' || sac.status === 'CONCLUDED' : true,
     noOpenDeficiencies: openDeficiencies === 0,
     openDeficienciesCount: openDeficiencies,
-    canExecuteDecision: (req.user.role === ROLES.COMPETENT_AUTHORITY || req.user.role === ROLES.SUPER_ADMIN) && (openDeficiencies === 0)
+    canExecuteDecision: (req.user.role === ROLES.COMPETENT_AUTHORITY) && (openDeficiencies === 0)
   };
 
-  return res.json({
-    decision,
+  const payload = decision || {
+    application_id: applicationId,
+    decision: null,
     prerequisites
-  });
-});
+  };
+
+  return successResponse(res, payload, 'Decision details retrieved');
+}
+
+router.get('/application/:applicationId', authenticateToken, handleGetDecision);
+router.get('/:applicationId', authenticateToken, handleGetDecision);
 
 /**
- * POST /api/decisions/execute
- * Execute formal statutory decision by Competent Authority
+ * Common handler for executing decision: /render and /execute
  */
-router.post('/execute', authenticateToken, (req, res) => {
-  const { applicationId, decision, remarks, conditions, reason } = req.body;
+function handleExecuteDecision(req, res) {
+  const { 
+    applicationId, 
+    decision, 
+    formalOrderNumber, 
+    approvedIntake, 
+    validityYears, 
+    reasoning, 
+    remarks, 
+    conditions 
+  } = req.body;
 
   if (!applicationId || !decision) {
-    return res.status(400).json({ error: 'applicationId and decision are required.' });
+    return errorResponse(res, 'applicationId and decision are required.', 400, 'VALIDATION_ERROR');
   }
 
-  // Statutory Authority Check
-  if (req.user.role !== ROLES.COMPETENT_AUTHORITY && req.user.role !== ROLES.SUPER_ADMIN) {
-    return res.status(403).json({
-      error: 'Statutory Privilege Violation',
-      message: 'Decision approval / rejection is strictly reserved for the Competent Authority. Administrative roles and AI assistance cannot bypass this requirement.'
-    });
+  // Statutory Authority Separation:
+  // Decision approval / rejection is strictly reserved for COMPETENT_AUTHORITY.
+  // Super Admin / Platform Admin alone cannot execute statutory orders without this designated role.
+  if (req.user.role !== ROLES.COMPETENT_AUTHORITY) {
+    return errorResponse(res, 'Statutory Privilege Violation: Decision approval / rejection is strictly reserved for the authorized Competent Authority under Section 10(k) of the AICTE Act.', 403, 'FORBIDDEN');
   }
 
   const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(applicationId);
   if (!app) {
-    return res.status(404).json({ error: 'Application not found' });
+    return errorResponse(res, 'Application not found', 404, 'NOT_FOUND');
   }
 
   // Validate no unresolved critical deficiencies
@@ -90,74 +119,72 @@ router.post('/execute', authenticateToken, (req, res) => {
   `).get(applicationId);
 
   if (openDef && openDef.count > 0) {
-    return res.status(400).json({
-      error: 'Unresolved Deficiencies Exist',
-      message: `Cannot issue statutory decision while ${openDef.count} critical deficiencies remain open.`
-    });
+    return errorResponse(res, `Cannot issue statutory decision while ${openDef.count} critical deficiencies remain open.`, 400, 'UNRESOLVED_CRITICAL_DEFICIENCIES');
   }
 
   const decisionId = 'dec_' + uuidv4().slice(0, 10);
-  const orderNumber = `AICTE/ORDER/${new Date().getFullYear()}/${Math.floor(100000 + Math.random() * 900000)}`;
+  const orderNumber = formalOrderNumber || `AICTE/ORDER/${new Date().getFullYear()}/${Math.floor(100000 + Math.random() * 900000)}`;
+  const finalReasoning = reasoning || remarks || 'Approved as per AICTE Approval Process Handbook (APH) 2026-27 norms.';
+  const finalIntake = approvedIntake ? Number(approvedIntake) : 180;
+  const finalYears = validityYears ? Number(validityYears) : 3;
 
-  db.prepare(`
-    INSERT INTO authority_decisions (
-      id, application_id, decision_maker_id, decision_maker_name, decision,
-      order_number, remarks, conditions, previous_status, new_status, prerequisites_verified
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(
-    decisionId,
-    applicationId,
-    req.user.id,
-    req.user.full_name,
-    decision,
-    orderNumber,
-    remarks || '',
-    conditions || '',
-    app.status,
-    decision
-  );
+  // Execute within a transaction
+  const executeDecisionTx = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO authority_decisions (
+        id, application_id, decision_maker_id, decision_maker_name,
+        authority_user_id, authority_name, authority_role,
+        decision, order_number, formal_order_number,
+        approved_intake, validity_years, reasoning, conditions
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      decisionId,
+      applicationId,
+      req.user.id,
+      req.user.full_name,
+      req.user.id,
+      req.user.full_name,
+      req.user.role,
+      decision,
+      orderNumber,
+      orderNumber,
+      decision === 'REJECTED' ? 0 : finalIntake,
+      decision === 'REJECTED' ? 0 : finalYears,
+      finalReasoning,
+      conditions || ''
+    );
 
-  // Update application status and approval_date
-  db.prepare(`
-    UPDATE applications SET
-      status = ?,
-      current_stage = ?,
-      approval_date = CURRENT_TIMESTAMP,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(decision, decision, applicationId);
+    db.prepare(`
+      UPDATE applications SET
+        status = ?,
+        current_stage = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(decision, decision, applicationId);
+  });
 
-  // Record workflow history
-  const historyId = 'wfh_' + uuidv4().slice(0, 10);
-  db.prepare(`
-    INSERT INTO application_workflow_history (
-      id, application_id, from_stage, to_stage, transitioned_by, transitioned_by_role, remarks, prerequisites_verified
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(
-    historyId,
-    applicationId,
-    app.status,
-    decision,
-    req.user.id,
-    req.user.role,
-    `Formal statutory order ${orderNumber} issued by Competent Authority: ${decision}.`
-  );
+  executeDecisionTx();
 
-  // Notify Institution
   createNotification({
     institutionId: app.institution_id,
-    title: `Statutory Decision Released: ${decision}`,
-    message: `Competent Authority has formally issued order ${orderNumber}: ${decision}. Remarks: ${remarks || 'None'}`,
+    title: `Statutory Decision Issued: ${decision}`,
+    message: `Competent Authority has rendered a decision of [${decision}] for application ${app.application_number}. Formal Order: ${orderNumber}.`,
     type: decision === 'APPROVED' ? 'SUCCESS' : 'WARNING',
-    link: '/applications'
+    link: '/decisions'
   });
 
-  return res.json({
-    success: true,
-    message: `Statutory decision [${decision}] formally executed and registered in government docket.`,
-    orderNumber,
-    decisionId
-  });
-});
+  return successResponse(res, {
+    decisionId,
+    decision,
+    formalOrderNumber: orderNumber,
+    approvedIntake: finalIntake,
+    validityYears: finalYears,
+    reasoning: finalReasoning,
+    applicationId
+  }, `Formal Statutory Order [${decision}] issued successfully.`, 201);
+}
+
+router.post('/render', authenticateToken, handleExecuteDecision);
+router.post('/execute', authenticateToken, handleExecuteDecision);
 
 module.exports = router;
