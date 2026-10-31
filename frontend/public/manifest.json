@@ -1,0 +1,20 @@
+{
+  "short_name": "AICTE",
+  "name": "AICTE - All India Council for Technical Education",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "type": "image/png",
+      "sizes": "64x64"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#12345A",
+  "theme_color": "#12345A",
+  "display": "standalone"
+}

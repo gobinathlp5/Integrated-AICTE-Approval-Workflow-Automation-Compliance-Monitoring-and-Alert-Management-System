@@ -45,6 +45,7 @@ export default function App() {
   });
 
   useEffect(() => {
+    document.title = 'AICTE';
     // Check if token exists and verify session
     const token = getAuthToken();
     if (token) {
