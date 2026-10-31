@@ -344,3 +344,112 @@ export const auditApi = {
 export const securityApi = {
   runTests: () => apiRequest('/security-tests/run', { method: 'POST' })
 };
+
+// =========================================================================
+// AICTE SECURITY DEPOSIT & FDR PORTAL (PS-26265) CLIENT APIS
+// =========================================================================
+
+export const fdrApi = {
+  getStats: () => apiRequest('/fdr/stats'),
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/fdr${query ? `?${query}` : ''}`);
+  },
+  getById: (id) => apiRequest(`/fdr/${id}`),
+  create: (payload) => apiRequest('/fdr', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  update: (id, payload) => apiRequest(`/fdr/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  }),
+  submit: (id) => apiRequest(`/fdr/${id}/submit`, {
+    method: 'POST'
+  }),
+  getHistory: (id) => apiRequest(`/fdr/${id}/history`),
+  uploadDocument: (id, formData) => apiRequest(`/fdr/${id}/documents`, {
+    method: 'POST',
+    body: formData
+  }),
+  getDocumentToken: (docId) => apiRequest(`/fdr/documents/${docId}/token`, {
+    method: 'POST'
+  }),
+  deleteDocument: (docId) => apiRequest(`/fdr/documents/${docId}`, {
+    method: 'DELETE'
+  })
+};
+
+export const fdrVerificationApi = {
+  getPending: () => apiRequest('/fdr-verification/pending'),
+  verify: (id, payload) => apiRequest(`/fdr-verification/${id}/verify`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  raiseDiscrepancy: (id, payload) => apiRequest(`/fdr-verification/${id}/discrepancy`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  respondDiscrepancy: (discrepancyId, payload) => apiRequest(`/fdr-verification/discrepancy/${discrepancyId}/respond`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  resolveDiscrepancy: (discrepancyId, payload) => apiRequest(`/fdr-verification/discrepancy/${discrepancyId}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+};
+
+export const fdrRenewalApi = {
+  getDue: () => apiRequest('/fdr-renewals/due'),
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/fdr-renewals${query ? `?${query}` : ''}`);
+  },
+  submit: (fdrId, payload) => apiRequest(`/fdr-renewals/${fdrId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  review: (renewalId, payload) => apiRequest(`/fdr-renewals/${renewalId}/review`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+};
+
+export const fdrReleaseApi = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/fdr-releases${query ? `?${query}` : ''}`);
+  },
+  request: (fdrId, payload) => apiRequest(`/fdr-releases/${fdrId}/request`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  scrutiny: (requestId, payload) => apiRequest(`/fdr-releases/${requestId}/scrutiny`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  decision: (requestId, payload) => apiRequest(`/fdr-releases/${requestId}/decision`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  complete: (requestId, payload) => apiRequest(`/fdr-releases/${requestId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+};
+
+export const fdrReportApi = {
+  getRegister: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiRequest(`/fdr-reports/register${query ? `?${query}` : ''}`);
+  },
+  getMaturityCalendar: () => apiRequest('/fdr-reports/maturity-calendar'),
+  getBankDistribution: () => apiRequest('/fdr-reports/bank-distribution'),
+  getComplianceSummary: () => apiRequest('/fdr-reports/compliance-summary'),
+  downloadCsv: () => {
+    const token = getAuthToken();
+    window.open(`/api/fdr-reports/register?format=csv&token=${encodeURIComponent(token || '')}`, '_blank');
+  }
+};
+

@@ -243,7 +243,7 @@ export default function Header({
                 All India Council for Technical Education
               </h1>
               <p className="text-[11px] text-slate-500 font-medium">
-                AICTE Digital Governance — Approval & Compliance Management Portal (SIH #26262)
+                Security Deposit & FDR Management Portal (SIH Problem Statement 26265)
               </p>
             </div>
           </div>
@@ -273,11 +273,11 @@ export default function Header({
           </span>
           <div className="overflow-hidden whitespace-nowrap text-[11px] font-semibold text-slate-900">
             <span>
-              ★ AICTE Approval Process Handbook (APH) 2026-27 statutory window open for Technical Institutions.
+              ★ AICTE Security Deposit & FDR Management Portal active for Academic Year 2026-27.
               &nbsp;&nbsp;•&nbsp;&nbsp;
-              ★ Scrutiny and EVC Inspections conducted under automated multi-tenant RBAC protocol.
+              ★ Automated 30-day and 15-day maturity tracking, bank confirmation workflow & discrepancy alerts enabled.
               &nbsp;&nbsp;•&nbsp;&nbsp;
-              ★ Mandatory submission of 7th CPC Faculty Pay Scale & Anti-Ragging Undertaking.
+              ★ Mandatory joint operation in favor of Regional Officer, AICTE & Member Secretary, AICTE.
             </span>
           </div>
         </div>

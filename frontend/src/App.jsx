@@ -4,6 +4,17 @@ import Sidebar from './components/Sidebar';
 import Breadcrumbs from './components/Breadcrumbs';
 import LoginModal from './components/LoginModal';
 import DashboardOverview from './components/DashboardOverview';
+
+// AICTE Security Deposit & FDR Management Portal (PS-26265) Views
+import FdrDashboard from './components/FdrDashboard';
+import FdrListView from './components/FdrListView';
+import FdrRegistrationModal from './components/FdrRegistrationModal';
+import FdrDetailDrawer from './components/FdrDetailDrawer';
+import FdrVerificationWorkspace from './components/FdrVerificationWorkspace';
+import FdrRenewalsView from './components/FdrRenewalsView';
+import FdrReleasesView from './components/FdrReleasesView';
+import FdrReportsView from './components/FdrReportsView';
+
 import DocumentRepository from './components/DocumentRepository';
 import ApplicationsView from './components/ApplicationsView';
 import WorkflowEngineView from './components/WorkflowEngineView';
@@ -40,6 +51,9 @@ export default function App() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [openEscalations, setOpenEscalations] = useState(0);
+  const [showFdrRegisterModal, setShowFdrRegisterModal] = useState(false);
+  const [selectedFdrId, setSelectedFdrId] = useState(null);
+  const [showFdrDrawer, setShowFdrDrawer] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('aicte_theme') === 'dark';
   });
@@ -183,10 +197,61 @@ export default function App() {
 
             {/* Tab Routed Views */}
             {currentTab === 'dashboard' && (
-              <DashboardOverview
+              <FdrDashboard
                 user={user}
                 onNavigate={setCurrentTab}
-                onOpenAiAssistant={() => setShowAiDrawer(true)}
+                onOpenRegisterModal={() => setShowFdrRegisterModal(true)}
+              />
+            )}
+
+            {currentTab === 'fdr-register' && (
+              <FdrListView
+                user={user}
+                onOpenRegisterModal={() => setShowFdrRegisterModal(true)}
+                onSelectFdr={(id) => {
+                  setSelectedFdrId(id);
+                  setShowFdrDrawer(true);
+                }}
+              />
+            )}
+
+            {currentTab === 'fdr-verification' && (
+              <FdrVerificationWorkspace
+                user={user}
+                onSelectFdr={(id) => {
+                  setSelectedFdrId(id);
+                  setShowFdrDrawer(true);
+                }}
+              />
+            )}
+
+            {currentTab === 'fdr-renewals' && (
+              <FdrRenewalsView
+                user={user}
+                onSelectFdr={(id) => {
+                  setSelectedFdrId(id);
+                  setShowFdrDrawer(true);
+                }}
+              />
+            )}
+
+            {currentTab === 'fdr-releases' && (
+              <FdrReleasesView
+                user={user}
+                onSelectFdr={(id) => {
+                  setSelectedFdrId(id);
+                  setShowFdrDrawer(true);
+                }}
+              />
+            )}
+
+            {currentTab === 'fdr-reports' && (
+              <FdrReportsView
+                user={user}
+                onSelectFdr={(id) => {
+                  setSelectedFdrId(id);
+                  setShowFdrDrawer(true);
+                }}
               />
             )}
 
@@ -275,6 +340,32 @@ export default function App() {
         user={user}
       />
 
+      {/* AICTE Security Deposit & FDR Management Modals (PS-26265) */}
+      <FdrRegistrationModal
+        isOpen={showFdrRegisterModal}
+        onClose={() => setShowFdrRegisterModal(false)}
+        user={user}
+        onSuccess={(id) => {
+          setSelectedFdrId(id);
+          setShowFdrDrawer(true);
+        }}
+      />
+
+      <FdrDetailDrawer
+        fdrId={selectedFdrId}
+        isOpen={showFdrDrawer}
+        onClose={() => setShowFdrDrawer(false)}
+        user={user}
+        onOpenRenewal={() => {
+          setShowFdrDrawer(false);
+          setCurrentTab('fdr-renewals');
+        }}
+        onOpenRelease={() => {
+          setShowFdrDrawer(false);
+          setCurrentTab('fdr-releases');
+        }}
+      />
+
       {/* Council Statutory Government Footer */}
       <footer className="bg-[#121926] text-slate-400 text-xs border-t border-slate-800 py-6 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-3">
@@ -282,13 +373,13 @@ export default function App() {
             <div>
               <span className="font-bold text-white text-sm">All India Council for Technical Education (AICTE)</span>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Nelson Mandela Marg, Vasant Kunj, New Delhi - 110070 • Phone: 011-29581000 • Regulation Bureau (Smart Automation)
+                Nelson Mandela Marg, Vasant Kunj, New Delhi - 110070 • Phone: 011-29581000 • Approval & Financial Regulation Bureau
               </p>
             </div>
 
             <div className="flex items-center space-x-2 text-[11px]">
               <span className="bg-[#F2A900] text-slate-950 px-2 py-0.5 rounded font-bold font-mono">
-                SIH Problem #26262
+                SIH Problem #26265
               </span>
               <span className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono">
                 SHA-256 Ledger Active
@@ -301,7 +392,7 @@ export default function App() {
               <span>Website Policies | Hyperlinking Policy | Privacy Policy | Copyright Policy | Terms & Conditions</span>
             </div>
             <div>
-              <span>Designed & Developed for AICTE Digital Governance Portal © 2026</span>
+              <span>AICTE Security Deposit & FDR Management Portal © 2026</span>
             </div>
           </div>
         </div>

@@ -11,7 +11,8 @@
     "test:api": "node tests/api-integration.test.js",
     "test:workflow": "node tests/e2e-workflow.test.js",
     "test:safeguards": "node tests/safeguards.test.js",
-    "test": "node tests/security.test.js && node tests/api-integration.test.js && node tests/e2e-workflow.test.js && node tests/safeguards.test.js"
+    "test:fdr": "node tests/fdr-lifecycle.test.js",
+    "test": "node tests/security.test.js && node tests/api-integration.test.js && node tests/e2e-workflow.test.js && node tests/safeguards.test.js && node tests/fdr-lifecycle.test.js"
   },
   "keywords": [],
   "author": "",

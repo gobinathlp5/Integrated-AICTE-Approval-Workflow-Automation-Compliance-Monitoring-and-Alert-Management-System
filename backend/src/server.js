@@ -14,6 +14,14 @@ const applicationRoutes = require('./routes/applicationRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const { router: securityTestRoutes } = require('./routes/securityTestRoutes');
 
+// AICTE Security Deposit & FDR Management Portal (PS-26265) routes
+const fdrRoutes = require('./routes/fdrRoutes');
+const fdrDocumentRoutes = require('./routes/fdrDocumentRoutes');
+const fdrVerificationRoutes = require('./routes/fdrVerificationRoutes');
+const fdrRenewalRoutes = require('./routes/fdrRenewalRoutes');
+const fdrReleaseRoutes = require('./routes/fdrReleaseRoutes');
+const fdrReportRoutes = require('./routes/fdrReportRoutes');
+
 // Newly integrated statutory lifecycle routes
 const workflowRoutes = require('./routes/workflowRoutes');
 const scrutinyRoutes = require('./routes/scrutinyRoutes');
@@ -52,10 +60,11 @@ app.use('/uploads', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ONLINE',
-    system: 'AICTE Integrated Approval Workflow & Compliance Management System',
-    problemStatementId: '26262',
-    department: 'AICTE Regulation Bureau',
-    version: '3.0.0-GOV',
+    system: 'AICTE Security Deposit & FDR Management Portal',
+    problemStatementId: '26265',
+    problemStatementTitle: 'Streamline of Security Deposit/FDR Portal',
+    department: 'AICTE Approval & Financial Regulation Bureau',
+    version: '4.0.0-FDR-GOV',
     timestamp: new Date().toISOString()
   });
 });
@@ -68,6 +77,14 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/security-tests', securityTestRoutes);
+
+// AICTE Security Deposit & FDR Portal Routes (PS-26265)
+app.use('/api/fdr', fdrRoutes);
+app.use('/api/fdr', fdrDocumentRoutes);
+app.use('/api/fdr-verification', fdrVerificationRoutes);
+app.use('/api/fdr-renewals', fdrRenewalRoutes);
+app.use('/api/fdr-releases', fdrReleaseRoutes);
+app.use('/api/fdr-reports', fdrReportRoutes);
 
 // Statutory & Regulatory Modules
 app.use('/api/workflows', workflowRoutes);
@@ -98,8 +115,8 @@ if (require.main === module) {
   startScheduler();
   app.listen(PORT, () => {
     console.log(`=======================================================`);
-    console.log(`AICTE Integrated Approval Workflow & Compliance System`);
-    console.log(`Problem Statement 26262 - Regulation Bureau`);
+    console.log(`AICTE Security Deposit & FDR Management Portal`);
+    console.log(`Problem Statement 26265 - Approval & Financial Bureau`);
     console.log(`API Gateway listening on http://localhost:${PORT}`);
     console.log(`=======================================================`);
   });

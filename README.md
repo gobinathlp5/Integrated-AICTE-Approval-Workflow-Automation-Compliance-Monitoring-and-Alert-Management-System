@@ -1,67 +1,73 @@
-# Integrated AICTE Approval Workflow Automation, Compliance Monitoring and Alert Management System
+# AICTE Security Deposit & FDR Management Portal
 
 [![CI/CD Pipeline](https://github.com/gobinathlp5/Integrated-AICTE-Approval-Workflow-Automation-Compliance-Monitoring-and-Alert-Management-System/actions/workflows/ci.yml/badge.svg)](https://github.com/gobinathlp5/Integrated-AICTE-Approval-Workflow-Automation-Compliance-Monitoring-and-Alert-Management-System/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node: >=18.0.0](https://img.shields.io/badge/Node->=18.0.0-green.svg)](https://nodejs.org/)
 [![Database: SQLite WAL](https://img.shields.io/badge/Database-SQLite_WAL_Mode-informational.svg)](https://sqlite.org/)
 
-**Problem Statement ID:** 26262  
+**Problem Statement ID:** 26265  
+**Problem Statement Title:** Streamline of Security Deposit/FDR Portal  
 **Organization:** All India Council for Technical Education (AICTE)  
-**Department:** Regulation Bureau  
-**Theme:** Smart Automation  
-**Product Identity:** AICTE Digital Governance — Approval & Compliance Management Portal  
+**Department:** Approval & Financial Regulation Bureau  
+**Product Identity:** AICTE Security Deposit & FDR Management Portal  
 
 ---
 
 ## 🏛️ Executive Summary
 
-The **Integrated AICTE Approval Workflow Automation, Compliance Monitoring and Alert Management System** is a government-grade digital portal engineered to streamline, digitize, and automate the end-to-end regulatory approval lifecycle for technical education institutions across India.
+The **AICTE Security Deposit & FDR Management Portal** is a production-grade, centralized, and intelligent enterprise platform engineered for the All India Council for Technical Education (AICTE) to streamline the complete administrative lifecycle of security deposits and Fixed Deposit Receipts (FDRs) associated with AICTE approval-related processes.
 
-Designed specifically for the AICTE Regulation Bureau under Smart Automation, this platform replaces fragmented paperwork with a unified regulatory operating system featuring:
-- **Centralized Authentication & RBAC:** Multi-tenant isolation across 13 administrative roles.
-- **Dynamic Cryptographic MFA:** Zero hardcoded codes; salted bcrypt OTP verification.
-- **Statutory Workflow Automation:** State machine guiding applications from intake to Scrutiny, EVC inspections, SAC hearings, and Competent Authority approvals.
-- **Tamper-Evident Document Vault:** Magic-byte validation, HMAC-SHA256 signed download tokens, watermarked preview, and SHA-256 audit ledger chaining.
-- **Compliance Scorecards & Statutory Undertakings:** Automated real-time institutional compliance scoring and tracking of legal undertakings.
-- **SLA & Escalation Engine:** Background scheduler automatically detecting overdue approvals and dispatching multi-tiered escalations.
+In accordance with the **AICTE Approval Process Handbook (APH)**, technical institutions across India deposit substantial statutory security deposits in joint names with the Regional Officer, AICTE, with exclusive lien marked in favor of the Member Secretary, AICTE.
+
+This platform replaces fragmented, paper-based registers and manual tracking with a unified regulatory operating system featuring:
+- **Statutory FDR Registry & Custody:** Complete centralized repository for all institutional security deposits, bank guarantees, and lien endorsements.
+- **Officer Verification Workspace:** Two-party verification comparing uploaded receipts and bank lien letters, supporting automated bank APIs, confirmation letters, and official email exchanges.
+- **Bi-directional Discrepancy Tracking:** Systematic raising of deficiencies (amount mismatch, missing joint mandate, invalid IFSC/bank), institution clarifications, and formal officer resolutions.
+- **Automated Maturity Monitoring & Alert Engine:** Real-time scanning identifying deposits maturing in ≤30 days, ≤15 days, or overdue/matured instruments, triggering multi-tier email and dashboard notifications with daily deduplication.
+- **Renewal & Replacement Workflows:** Structured pathways for same-FDR extensions or replacement by newly registered instruments with audit cross-linking.
+- **Release & Refund Lifecycle:** Formal request submission upon completion of statutory tenure, technical officer scrutiny, Competent Authority approval, and lien revocation recording.
+- **Tamper-Evident SHA-256 Audit Trail:** Cryptographic hash chaining on all document mutations and financial state transitions.
+- **Multi-Tenant Isolation & RBAC:** Strict tenant boundaries across 13 administrative roles.
 
 ---
 
 ## 🚀 Quick Start Guide
 
 ### 1. Prerequisites
-- Node.js (v18.x or v20.x)
+- Node.js (v18.x or v20.x, tested on v24)
 - npm (v9.x or higher)
 
-### 2. Automated Test Suite (Security, Integration & Workflow)
-Run all 52 automated tests verifying tenant isolation, cryptographic MFA, and end-to-end statutory workflows:
+### 2. Run Comprehensive Automated Test Suites
+Execute all automated test suites covering security isolation, API contracts, statutory safeguards, and the full FDR lifecycle:
 ```bash
-npm test
+npm --prefix backend test
 ```
+*Runs all 5 test suites (Security, API Contracts, Workflow Engine, Safeguards, and FDR Lifecycle) with 100% pass rate.*
 
 ### 3. Running the Complete Application
 
-Run both backend and frontend concurrently:
+**Option A — Concurrent Execution (Recommended):**
 ```bash
 npm start
 ```
-Or start each service independently:
 
-**Backend API Service:**
+**Option B — Independent Services:**
+
+Backend API Service:
 ```bash
 npm run start:backend
 # API server listening on http://localhost:5000
 ```
 
-**Frontend Portal:**
+Frontend Client Web App:
 ```bash
 npm run start:frontend
-# Client web application available at http://localhost:3000
+# Client portal accessible at http://localhost:3000
 ```
 
 ---
 
-## 👥 Pre-Configured Personas & Test Credentials
+## 👥 Personas & Pre-Configured Test Credentials
 
 All pre-configured testing accounts share the standardized test password: `Password@123`
 
@@ -72,109 +78,113 @@ All pre-configured testing accounts share the standardized test password: `Passw
 | **Regulation Bureau Officer** | `regbureau` | Prof. Rajive Kumar | Regulation Bureau Policy & Oversight |
 | **Regional Officer** | `regionalofficer` | Dr. Sunil Luthra | Northern Regional Directorate Verification |
 | **Bureau Officer** | `bureauofficer` | Smt. Vandana Sharma | National Approval Bureau Management |
-| **Scrutiny Officer** | `scrutinyofficer` | Dr. R. K. Sharma | Statutory Evaluation & Deficiency Issuance |
-| **EVC Coordinator** | `evccoordinator` | Prof. Anjali Mathur | Expert Committee Inspection Scheduling |
-| **EVC Member (Assigned)** | `evcmember` | Dr. Vikramaditya Sen | Inspection Execution & Report Submission |
-| **EVC Member (Unassigned)** | `evcmember2` | Dr. Ramesh Joshi | Unassigned Inspection Panel (ABAC Testing) |
-| **SAC/SHC Member** | `sacmember` | Prof. D. K. Murthy | Standing Appellate Committee Jurist |
-| **Competent Authority** | `competentauthority` | Appellate Authority | Exclusive Statutory Approval Order Signing |
+| **Scrutiny Officer** | `scrutinyofficer` | Dr. R. K. Sharma | FDR Technical Scrutiny & Deficiency Issuance |
+| **Competent Authority** | `competentauthority` | Appellate Authority | Final Statutory Release & Refund Order Signing |
 | **Institution A Admin** | `instadmin` | Dr. Arvind Verma | Delhi Institute of Technology (Applicant) |
-| **Institution A Staff** | `inststaff` | Sri Ramesh Narayan | Delhi Institute Registrar / Submission Staff |
+| **Institution A Staff** | `inststaff` | Sri Ramesh Narayan | Delhi Institute Submission Staff |
 | **Institution B Admin** | `instadmin_b` | Dr. Suresh Patil | Mumbai College of Engineering (Tenant B) |
 | **Statutory Auditor (CAG)** | `auditor` | Shri Alok Jain | Strict Read-Only Statutory Oversight & Auditing |
 
 ---
 
-## 🔐 Core Security & Architectural Highlights
-
-### 1. Strict Multi-Tenant Isolation
-- Institutional applicants cannot view or query applications, documents, or deficiencies belonging to another institution (`HTTP 403 Forbidden`).
-- Document downloads require HMAC-SHA256 cryptographically signed tokens with strict 5-minute time windows.
-
-### 2. Dynamic Cryptographic Multi-Factor Authentication
-- Eradicated all hardcoded demonstration OTPs.
-- Uses cryptographically secure pseudorandom numbers (`crypto.randomInt`), salted with bcrypt, and bounded by a 5-minute time-to-live with a 3-attempt lockout policy.
-
-### 3. Binary Magic Byte Validation & Safe Storage
-- Prevents file spoofing and malicious executable uploads (`PE MZ`, scripts).
-- Whitelists only `%PDF-`, PNG, JPEG, and Word formats with full SHA-256 integrity checksumming.
-- Enforces path sanitization to eliminate directory traversal attacks (`../`).
-
-### 4. Tamper-Evident Cryptographic Ledger
-- Audit entries are cryptographically chained:
-  $$H_i = \text{SHA-256}(H_{i-1} \parallel \text{audit\_id} \parallel \text{action} \parallel \text{user\_id} \parallel \text{timestamp})$$
-- SQLite database triggers prevent any modification (`UPDATE` or `DELETE`) to existing audit entries.
-
-### 5. Automated SLA Escalation Engine
-- Continuously scans applications exceeding statutory review timelines (Scrutiny > 14 days, EVC > 21 days, Expiring Undertakings < 30 days).
-- Dispatches multi-level escalation notices to regional and bureau directors.
-
----
-
-## 📁 Repository Structure
+## 🏦 End-to-End FDR Lifecycle Architecture
 
 ```
-├── .github/
-│   └── workflows/
-│       └── ci.yml               # Automated CI/CD test and build validation
-├── backend/
-│   ├── data/
-│   │   └── aicte.db             # SQLite WAL database with versioned migrations
-│   ├── src/
-│   │   ├── routes/              # Express API route modules (Auth, App, Doc, EVC, etc.)
-│   │   ├── auth.js              # Cryptographic authentication & RBAC kernel
-│   │   ├── db.js                # Database schema, triggers & versioned migrations
-│   │   ├── scheduler.js         # SLA monitoring & automated escalation daemon
-│   │   ├── server.js            # Express server initialization
-│   │   └── tokenService.js      # HMAC-SHA256 document access token generator
-│   ├── tests/
-│   │   ├── security.test.js     # Security & tenant isolation test suite
-│   │   ├── api-integration.test.js # API contract & RBAC integration tests
-│   │   └── e2e-workflow.test.js # Full statutory approval workflow test suite
-│   └── .env.example             # Environment variable specification template
-├── frontend/
-│   ├── src/
-│   │   ├── components/          # Reusable UI components & Government navigation bar
-│   │   ├── pages/               # Role-specific dashboards & workflow views
-│   │   ├── services/            # Centralized API service client
-│   │   ├── App.jsx              # Routing & role-based view switcher
-│   │   └── main.jsx             # React entry point
-│   └── package.json             # Frontend dependencies & build script
-├── docs/
-│   └── ARCHITECTURE_AND_SECURITY.md # Deep technical architecture specifications
-├── ARCHITECTURE.md              # System architecture & data flow diagrams
-└── README.md                    # Official Project Overview & Instructions
+                       [ Institution ]
+                              │
+                    (1) Register FDR Receipt
+                              │
+                    (2) Upload Scanned Copy & Lien Mandate
+                              │
+                    (3) Submit for Verification
+                              ▼
+                   [ Verification Workspace ]
+                     (Council Officer Review)
+                              │
+        ┌─────────────────────┴─────────────────────┐
+        ▼                                           ▼
+ [ Discrepancy Found ]                    [ Verified & Compliant ]
+        │                                           │
+  (4) Raise Discrepancy                     (5) Mark VERIFIED
+  (Amount / Lien / IFSC)                            │
+        │                                    [ Status: ACTIVE ]
+  (4a) Inst. Clarification                          │
+        │                                   (6) Background Scheduler
+  (4b) Officer Resolution                   (Maturity Scan: 30d / 15d / 0d)
+        │                                           │
+        └─────────────────►◄────────────────────────┘
+                            │
+               ┌────────────┴────────────┐
+               ▼                         ▼
+      [ Maturity Approaching ]     [ Statutory Tenure Met ]
+               │                         │
+     (7) Renewal Application     (8) Release & Refund Request
+       - Same FDR Extended               │
+       - Replacement Linked      (8a) Officer Scrutiny
+               │                         │
+     (7a) Officer Approval       (8b) Competent Authority Order
+               │                         │
+     [ Status: ACTIVE/RENEWED ]  (8c) Lien Revocation
+                                         │
+                                 [ Status: RELEASED ]
 ```
 
 ---
 
-## 🧪 Verification & Acceptance Evidence
+## 📡 Canonical API Contract (Problem Statement 26265)
 
-Automated tests provide verifiable proof of compliance:
+### 1. FDR Master Records (`/api/fdr`)
+- `GET /api/fdr/stats` — Dashboard metrics (Active, Expiring Soon, Matured, Released, Total Value)
+- `GET /api/fdr` — Paginated FDR list with search, bank, status, and maturity filters
+- `GET /api/fdr/:id` — Complete FDR record with linked documents, verifications, discrepancies, and renewals
+- `POST /api/fdr` — Register new FDR (Draft or Submitted)
+- `PUT /api/fdr/:id` — Update draft or pending FDR details
+- `POST /api/fdr/:id/submit` — Formally submit draft FDR for officer verification
+- `GET /api/fdr/:id/history` — Tamper-evident audit history of this instrument
 
-```
-========================================================
-AICTE PLATFORM: RUNNING MANDATORY SECURITY & ACCEPTANCE TESTS
-========================================================
-[✅ PASS] SEC-TEST-01: Institution A cannot access Institution B's documents
-[✅ PASS] SEC-TEST-02: Institution cannot access internal AICTE notes
-[✅ PASS] SEC-TEST-03: Unassigned EVC member cannot access another committee's documents
-[✅ PASS] SEC-TEST-04: Scrutiny officer cannot modify institution statutory files
-[✅ PASS] SEC-TEST-05: Auditor cannot modify records (Read-Only Statutory Enforcement)
-[✅ PASS] SEC-TEST-06: Anti-IDOR URL & parameter tampering protection
-[✅ PASS] SEC-TEST-07: Expired cryptographic access links cannot be reused
-[✅ PASS] SEC-TEST-08: Tamper-evident SHA-256 audit ledger integrity verified
-[✅ PASS] SEC-TEST-09: Universal 123456 MFA code strictly rejected
-========================================================
-API INTEGRATION SUMMARY: 30 PASSED, 0 FAILED.
-========================================================
-END-TO-END WORKFLOW SUMMARY: 13 PASSED, 0 FAILED.
-========================================================
-TOTAL: 52 PASSED, 0 FAILED.
-```
+### 2. Documents & Evidence (`/api/fdr`)
+- `POST /api/fdr/:id/documents` — Multipart upload with SHA-256 integrity calculation
+- `POST /api/fdr/documents/:docId/token` — Generate HMAC-SHA256 signed temporary token (5-min window)
+- `GET /api/fdr/documents/:docId/download` — Authorized download stream
+- `GET /api/fdr/documents/:docId/preview` — In-browser preview with watermarking
+- `DELETE /api/fdr/documents/:docId` — Safe deletion of draft documents
+
+### 3. Verification & Discrepancies (`/api/fdr-verification`)
+- `GET /api/fdr-verification/pending` — Officer queue of instruments awaiting verification
+- `POST /api/fdr-verification/:id/verify` — Record officer verification outcome (`VERIFIED`, `DEFICIENT`, `REJECTED`, `SUSPECTED_FRAUD`)
+- `POST /api/fdr-verification/:id/discrepancy` — Issue formal discrepancy notice
+- `POST /api/fdr-verification/discrepancy/:id/respond` — Institution clarification response
+- `POST /api/fdr-verification/discrepancy/:id/resolve` — Officer resolves or waives discrepancy
+
+### 4. Renewals & Replacements (`/api/fdr-renewals`)
+- `GET /api/fdr-renewals/due` — List of instruments nearing maturity or matured past due date
+- `GET /api/fdr-renewals` — Renewal application tracking list
+- `POST /api/fdr-renewals/:fdrId/submit` — Submit renewal application (Extension or Replacement)
+- `POST /api/fdr-renewals/:renewalId/review` — Officer review determination (`APPROVED`, `REJECTED`)
+
+### 5. Release & Refund (`/api/fdr-releases`)
+- `GET /api/fdr-releases` — List release and refund requests
+- `POST /api/fdr-releases/:fdrId/request` — Institution requests release with statutory justification
+- `POST /api/fdr-releases/:requestId/scrutiny` — Technical scrutiny by reviewing officer
+- `POST /api/fdr-releases/:requestId/decision` — Competent Authority statutory release order
+- `POST /api/fdr-releases/:requestId/complete` — Finalize lien removal and unblock funds
+
+### 6. Analytics & Reports (`/api/fdr-reports`)
+- `GET /api/fdr-reports/register` — Full FDR Register (JSON format or `?format=csv` export)
+- `GET /api/fdr-reports/maturity-calendar` — 24-month forecast of scheduled deposit maturities
+- `GET /api/fdr-reports/bank-distribution` — Volume and deposit amounts by scheduled bank
+- `GET /api/fdr-reports/compliance-summary` — Regional compliance breakdown across AICTE regions
 
 ---
 
-## 📜 Regulatory Disclaimer
+## 🔐 Security & Governance Guardrails
 
-This software has been developed in strict alignment with AICTE Approval Process Handbook (APH) norms and Government of India regulatory standards for Problem Statement 26262.
+1. **Strict Multi-Tenant Isolation:**
+   - Institutional users are strictly scoped to their own `institution_id`. Cross-tenant querying is rejected with `HTTP 403 Forbidden`.
+2. **Deterministic Immutability:**
+   - Every mutation generates an entry in `document_audit_trail` linked by SHA-256 cryptographic chain.
+   - SQLite triggers `prevent_audit_update` and `prevent_audit_delete` guarantee ledger immutability.
+3. **Public Uploads Blocked:**
+   - Direct static access to `/uploads/` returns `HTTP 403 DIRECT_ACCESS_FORBIDDEN`. All file downloads must use authorized bearer tokens or signed HMAC-SHA256 tokens.
+4. **Zero Mock Data in Production Paths:**
+   - All dashboard figures, charts, registers, and verification lists are live relational queries against SQLite WAL database.

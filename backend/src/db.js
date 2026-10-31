@@ -540,6 +540,179 @@ function initDb() {
       name TEXT NOT NULL,
       applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- =========================================================================
+    -- AICTE SECURITY DEPOSIT & FDR PORTAL (PS-26265) RELATIONAL LIFECYCLE TABLES
+    -- =========================================================================
+
+    -- FDR Master Records
+    CREATE TABLE IF NOT EXISTS fdr_records (
+      id TEXT PRIMARY KEY,
+      fdr_number TEXT UNIQUE NOT NULL,
+      institution_id TEXT NOT NULL,
+      instrument_type TEXT DEFAULT 'FIXED_DEPOSIT', -- FIXED_DEPOSIT, BANK_GUARANTEE
+      issuing_bank TEXT NOT NULL,
+      bank_branch TEXT NOT NULL,
+      ifsc_code TEXT NOT NULL,
+      bank_ref TEXT,
+      deposit_amount REAL NOT NULL,
+      currency TEXT DEFAULT 'INR',
+      issue_date DATE NOT NULL,
+      maturity_date DATE NOT NULL,
+      deposit_holder TEXT NOT NULL,
+      joint_holder_name TEXT DEFAULT 'Regional Officer, AICTE',
+      beneficiary TEXT DEFAULT 'Member Secretary, AICTE',
+      interest_rate REAL,
+      auto_renewal INTEGER DEFAULT 0,
+      lien_marked INTEGER DEFAULT 1,
+      lien_ref TEXT,
+      purpose TEXT NOT NULL, -- NEW_INSTITUTION, NEW_PROGRAMME, ADDITIONAL_INTAKE, LAND_NORMS, REGULATORY_SECURITY, OTHER
+      status TEXT DEFAULT 'PENDING_VERIFICATION', -- DRAFT, PENDING_VERIFICATION, ACTIVE, MATURING_SOON, MATURED, RENEWAL_DUE, RENEWED, RELEASE_REQUESTED, RELEASED, ENCASHED, FORFEITED, REJECTED
+      verification_status TEXT DEFAULT 'PENDING', -- PENDING, VERIFIED, DISCREPANT, REJECTED
+      is_replacement INTEGER DEFAULT 0,
+      original_fdr_id TEXT,
+      replacement_fdr_id TEXT,
+      submission_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      verified_by_user_id TEXT,
+      verified_by_name TEXT,
+      verified_at DATETIME,
+      verification_method TEXT,
+      remarks TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (institution_id) REFERENCES institutions(id)
+    );
+
+    -- FDR Documents (Scans, Lien Letters, Joint Operation Mandates)
+    CREATE TABLE IF NOT EXISTS fdr_documents (
+      id TEXT PRIMARY KEY,
+      fdr_id TEXT NOT NULL,
+      institution_id TEXT NOT NULL,
+      document_type TEXT NOT NULL, -- FDR_SCAN, BANK_LIEN_LETTER, JOINT_OPERATION_LETTER, RENEWAL_ADVICE, RELEASE_ORDER, BANK_CONFIRMATION, OTHER
+      file_name TEXT NOT NULL,
+      stored_path TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      mime_type TEXT NOT NULL,
+      file_hash_sha256 TEXT NOT NULL,
+      version INTEGER DEFAULT 1,
+      verification_status TEXT DEFAULT 'UNVERIFIED', -- UNVERIFIED, VALID, INVALID, DEFICIENT
+      uploaded_by TEXT NOT NULL,
+      uploaded_by_name TEXT NOT NULL,
+      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (fdr_id) REFERENCES fdr_records(id),
+      FOREIGN KEY (institution_id) REFERENCES institutions(id)
+    );
+
+    -- FDR Formal Officer Verifications
+    CREATE TABLE IF NOT EXISTS fdr_verifications (
+      id TEXT PRIMARY KEY,
+      fdr_id TEXT NOT NULL,
+      officer_id TEXT NOT NULL,
+      officer_name TEXT NOT NULL,
+      officer_role TEXT NOT NULL,
+      verification_method TEXT NOT NULL, -- BANK_API, OFFICIAL_EMAIL, PHYSICAL_LETTER, PORTAL_VERIFICATION
+      bank_confirmation_ref TEXT,
+      bank_contact_person TEXT,
+      bank_contact_email TEXT,
+      result TEXT NOT NULL, -- VERIFIED, DEFICIENT, REJECTED, SUSPECTED_FRAUD
+      observations TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (fdr_id) REFERENCES fdr_records(id)
+    );
+
+    -- FDR Discrepancy & Deficiency Tracking
+    CREATE TABLE IF NOT EXISTS fdr_discrepancies (
+      id TEXT PRIMARY KEY,
+      fdr_id TEXT NOT NULL,
+      institution_id TEXT NOT NULL,
+      category TEXT NOT NULL, -- AMOUNT_MISMATCH, NAME_MISMATCH, MISSING_JOINT_HOLDER, MISSING_LIEN, MATURITY_SHORTFALL, BRANCH_IFSC_INVALID, UNREADABLE_SCAN, OTHER
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      severity TEXT DEFAULT 'MEDIUM', -- LOW, MEDIUM, HIGH, CRITICAL
+      raised_by_id TEXT NOT NULL,
+      raised_by_name TEXT NOT NULL,
+      status TEXT DEFAULT 'OPEN', -- OPEN, INSTITUTION_RESPONDED, RESOLVED, WAIVED
+      institution_response TEXT,
+      response_document_id TEXT,
+      responded_at DATETIME,
+      resolved_by_id TEXT,
+      resolved_by_name TEXT,
+      resolved_at DATETIME,
+      resolution_remarks TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (fdr_id) REFERENCES fdr_records(id),
+      FOREIGN KEY (institution_id) REFERENCES institutions(id)
+    );
+
+    -- FDR Renewal & Replacement Requests
+    CREATE TABLE IF NOT EXISTS fdr_renewals (
+      id TEXT PRIMARY KEY,
+      original_fdr_id TEXT NOT NULL,
+      replacement_fdr_id TEXT,
+      institution_id TEXT NOT NULL,
+      renewal_type TEXT NOT NULL, -- SAME_FDR_EXTENDED, NEW_FDR_REPLACEMENT
+      requested_by TEXT NOT NULL,
+      requested_by_name TEXT NOT NULL,
+      status TEXT DEFAULT 'SUBMITTED', -- DRAFT, SUBMITTED, UNDER_VERIFICATION, APPROVED, REJECTED
+      remarks TEXT,
+      reviewed_by_id TEXT,
+      reviewed_by_name TEXT,
+      reviewed_at DATETIME,
+      review_decision TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (original_fdr_id) REFERENCES fdr_records(id),
+      FOREIGN KEY (institution_id) REFERENCES institutions(id)
+    );
+
+    -- FDR Release and Refund Requests
+    CREATE TABLE IF NOT EXISTS fdr_release_requests (
+      id TEXT PRIMARY KEY,
+      fdr_id TEXT NOT NULL,
+      institution_id TEXT NOT NULL,
+      request_number TEXT UNIQUE NOT NULL,
+      reason TEXT NOT NULL, -- TENURE_COMPLETED, REGULATORY_EXEMPTION, CLOSURE_OF_COURSE, INSTITUTION_CLOSURE, OTHER
+      supporting_document_id TEXT,
+      requested_by_id TEXT NOT NULL,
+      requested_by_name TEXT NOT NULL,
+      status TEXT DEFAULT 'REQUESTED', -- REQUESTED, UNDER_SCRUTINY, CA_APPROVED, CA_REJECTED, RELEASE_COMPLETED
+      review_officer_id TEXT,
+      review_officer_name TEXT,
+      review_notes TEXT,
+      decision TEXT,
+      decision_maker_id TEXT,
+      decision_maker_name TEXT,
+      decision_remarks TEXT,
+      decision_at DATETIME,
+      release_evidence_doc_id TEXT,
+      release_completed_by TEXT,
+      release_completed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (fdr_id) REFERENCES fdr_records(id),
+      FOREIGN KEY (institution_id) REFERENCES institutions(id)
+    );
+
+    -- Automated Reminder Rules Configuration
+    CREATE TABLE IF NOT EXISTS fdr_reminder_rules (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      trigger_event TEXT NOT NULL, -- MATURITY_APPROACHING, MATURED_OVERDUE, VERIFICATION_PENDING, DISCREPANCY_UNRESOLVED
+      days_threshold INTEGER NOT NULL,
+      recipient_role TEXT NOT NULL,
+      template TEXT,
+      is_enabled INTEGER DEFAULT 1
+    );
+
+    -- FDR Automated Alerts Sent Log (for deduplication)
+    CREATE TABLE IF NOT EXISTS fdr_alerts_sent (
+      id TEXT PRIMARY KEY,
+      fdr_id TEXT NOT NULL,
+      rule_id TEXT,
+      recipient_email TEXT,
+      recipient_role TEXT,
+      alert_type TEXT NOT NULL,
+      sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
   `);
 
   // Safely check and add any missing columns in existing tables
@@ -675,7 +848,8 @@ function initDb() {
       { version: 7, name: 'Compliance Obligations, Notifications and Escalations' },
       { version: 8, name: 'Document Security, Audit Trail and Immutable Triggers' },
       { version: 9, name: 'Cryptographic MFA, Account Recovery and Institutional Verification Lifecycle' },
-      { version: 10, name: 'Deterministic Order Number Allocation Sequence and Workflow Guardrails' }
+      { version: 10, name: 'Deterministic Order Number Allocation Sequence and Workflow Guardrails' },
+      { version: 11, name: 'AICTE Security Deposit and FDR Relational Lifecycle Tables' }
     ];
 
     const recordMigration = db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (?, ?)');

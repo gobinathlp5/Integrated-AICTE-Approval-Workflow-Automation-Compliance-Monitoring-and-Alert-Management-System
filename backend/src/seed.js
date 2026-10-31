@@ -839,6 +839,364 @@ function seedDatabase() {
     details: { purpose: 'Preliminary Scrutiny Evaluation' }
   });
 
+  // =========================================================================
+  // 15. AICTE SECURITY DEPOSIT & FDR PORTAL (PS-26265) SEED RECORDS
+  // =========================================================================
+  console.log('Seeding AICTE Security Deposit & FDR Lifecycle entities...');
+
+  // Create physical sample receipt file in uploadsDir
+  const samplePdfContent = Buffer.from('%PDF-1.4 sample FDR receipt scan verification document AICTE Security Deposit 26265');
+  const sampleFdrFilePath = path.join(uploadsDir, 'sample-fdr-receipt-9842.pdf');
+  if (!fs.existsSync(sampleFdrFilePath)) {
+    fs.writeFileSync(sampleFdrFilePath, samplePdfContent);
+  }
+
+  const insertFdr = db.prepare(`
+    INSERT OR REPLACE INTO fdr_records (
+      id, fdr_number, institution_id, instrument_type, issuing_bank,
+      bank_branch, ifsc_code, bank_ref, deposit_amount, currency,
+      issue_date, maturity_date, deposit_holder, joint_holder_name, beneficiary,
+      interest_rate, auto_renewal, lien_marked, lien_ref, purpose,
+      status, verification_status, submission_date, verified_by_user_id, verified_by_name,
+      verified_at, verification_method, remarks, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `);
+
+  // Today and offsets for realistic dynamic dates
+  const now = new Date();
+  const dToday = now.toISOString().split('T')[0];
+  const dIn12Days = new Date(Date.now() + 12 * 86400000).toISOString().split('T')[0];
+  const dMinus45Days = new Date(Date.now() - 45 * 86400000).toISOString().split('T')[0];
+  const dIn5Years = new Date(Date.now() + 5 * 365 * 86400000).toISOString().split('T')[0];
+  const dIn8Years = new Date(Date.now() + 8 * 365 * 86400000).toISOString().split('T')[0];
+
+  // FDR 1: Active Verified Deposit (Delhi)
+  insertFdr.run(
+    'fdr_delhi_001',
+    'FDR-2024-SBI-984210',
+    'inst_delhi_001',
+    'FIXED_DEPOSIT',
+    'State Bank of India',
+    'Vasant Kunj Institutional Area, New Delhi',
+    'SBIN0004521',
+    'SBI/FDR/2024/984210',
+    3500000,
+    'INR',
+    '2024-01-15',
+    dIn5Years,
+    'Delhi Institute of Technology & Advanced Science Trust',
+    'Regional Officer, AICTE (North)',
+    'Member Secretary, AICTE',
+    7.1,
+    0,
+    1,
+    'LIEN/AICTE/NWRO/2024/88',
+    'NEW_INSTITUTION',
+    'ACTIVE',
+    'VERIFIED',
+    '2024-01-16 10:00:00',
+    'usr_regional_north_01',
+    'Dr. K. N. Rao (Regional Officer)',
+    '2024-01-20 14:30:00',
+    'BANK_API',
+    'Mandatory statutory security deposit for establishment of new technical institute.'
+  );
+
+  // FDR 2: Maturing Soon in 12 days (Delhi)
+  insertFdr.run(
+    'fdr_delhi_002',
+    'FDR-2021-PNB-104922',
+    'inst_delhi_001',
+    'FIXED_DEPOSIT',
+    'Punjab National Bank',
+    'Connaught Place, New Delhi',
+    'PUNB0012900',
+    'PNB/FDR/2021/104922',
+    1500000,
+    'INR',
+    '2021-02-10',
+    dIn12Days,
+    'Delhi Institute of Technology & Advanced Science Trust',
+    'Regional Officer, AICTE (North)',
+    'Member Secretary, AICTE',
+    6.8,
+    0,
+    1,
+    'LIEN/AICTE/NWRO/2021/12',
+    'NEW_PROGRAMME',
+    'MATURING_SOON',
+    'VERIFIED',
+    '2021-02-12 11:00:00',
+    'usr_regional_north_01',
+    'Dr. K. N. Rao (Regional Officer)',
+    '2021-02-15 16:00:00',
+    'CONFIRMATION_LETTER',
+    'Security deposit for introducing PG MBA programme. Renewal or replacement due soon.'
+  );
+
+  // FDR 3: Matured / Renewal Due (Delhi)
+  insertFdr.run(
+    'fdr_delhi_003',
+    'FDR-2018-BOB-771209',
+    'inst_delhi_001',
+    'FIXED_DEPOSIT',
+    'Bank of Baroda',
+    'Nehru Place, New Delhi',
+    'BARB0NEHRUP',
+    'BOB/FDR/2018/771209',
+    2500000,
+    'INR',
+    '2018-08-01',
+    dMinus45Days,
+    'Delhi Institute of Technology & Advanced Science Trust',
+    'Regional Officer, AICTE (North)',
+    'Member Secretary, AICTE',
+    6.5,
+    0,
+    1,
+    'LIEN/AICTE/NWRO/2018/09',
+    'ADDITIONAL_INTAKE',
+    'MATURED',
+    'VERIFIED',
+    '2018-08-05 10:00:00',
+    'usr_regional_north_01',
+    'Dr. K. N. Rao (Regional Officer)',
+    '2018-08-10 12:00:00',
+    'PORTAL_VERIFICATION',
+    'Security deposit for intake variation in CSE. Instrument reached maturity. Renewal pending.'
+  );
+
+  // FDR 4: Pending Verification (Delhi)
+  insertFdr.run(
+    'fdr_delhi_004',
+    'FDR-2026-HDFC-338190',
+    'inst_delhi_001',
+    'FIXED_DEPOSIT',
+    'HDFC Bank Ltd',
+    'Hauz Khas, New Delhi',
+    'HDFC0000120',
+    'HDFC/FDR/2026/338190',
+    5000000,
+    'INR',
+    '2026-02-01',
+    dIn8Years,
+    'Delhi Institute of Technology & Advanced Science Trust',
+    'Regional Officer, AICTE (North)',
+    'Member Secretary, AICTE',
+    7.5,
+    0,
+    1,
+    'LIEN/AICTE/NWRO/2026/04',
+    'LAND_NORMS',
+    'PENDING_VERIFICATION',
+    'PENDING',
+    '2026-02-02 09:30:00',
+    null,
+    null,
+    null,
+    null,
+    'Security deposit in lieu of built-up/land norms relaxation submitted for AICTE officer verification.'
+  );
+
+  // FDR 5: Discrepancy Open (Mumbai)
+  insertFdr.run(
+    'fdr_mumbai_001',
+    'FDR-2025-BOI-449102',
+    'inst_mumbai_002',
+    'FIXED_DEPOSIT',
+    'Bank of India',
+    'Fort Branch, Mumbai',
+    'BKID0000001',
+    'BOI/FDR/2025/449102',
+    3000000,
+    'INR',
+    '2025-06-10',
+    dIn5Years,
+    'Mumbai Education Society',
+    'Regional Officer, AICTE (West)',
+    'Member Secretary, AICTE',
+    7.0,
+    0,
+    1,
+    'LIEN/AICTE/WRO/2025/33',
+    'NEW_PROGRAMME',
+    'PENDING_VERIFICATION',
+    'DISCREPANT',
+    '2025-06-15 14:00:00',
+    null,
+    null,
+    null,
+    null,
+    'Discrepancy noted during scrutiny: Joint holder mandate letter missing official seal.'
+  );
+
+  // FDR 6: Release Requested (Mumbai)
+  insertFdr.run(
+    'fdr_mumbai_002',
+    'FDR-2016-CAN-882014',
+    'inst_mumbai_002',
+    'FIXED_DEPOSIT',
+    'Canara Bank',
+    'Andheri East, Mumbai',
+    'CNRB0001234',
+    'CAN/FDR/2016/882014',
+    4000000,
+    'INR',
+    '2016-04-01',
+    '2026-04-01',
+    'Mumbai Education Society',
+    'Regional Officer, AICTE (West)',
+    'Member Secretary, AICTE',
+    6.25,
+    0,
+    1,
+    'LIEN/AICTE/WRO/2016/77',
+    'NEW_INSTITUTION',
+    'RELEASE_REQUESTED',
+    'VERIFIED',
+    '2016-04-05 11:30:00',
+    'usr_regional_north_01',
+    'Dr. K. N. Rao (Regional Officer)',
+    '2016-04-10 15:00:00',
+    'CONFIRMATION_LETTER',
+    'Completed statutory 10-year lock-in period with full compliance. Application submitted for deposit refund.'
+  );
+
+  // FDR 7: Released / Lien Revoked
+  insertFdr.run(
+    'fdr_delhi_005',
+    'FDR-2014-ICICI-551098',
+    'inst_delhi_001',
+    'FIXED_DEPOSIT',
+    'ICICI Bank Ltd',
+    'South Extension, New Delhi',
+    'ICIC0000007',
+    'ICICI/FDR/2014/551098',
+    2000000,
+    'INR',
+    '2014-03-01',
+    '2024-03-01',
+    'Delhi Institute of Technology & Advanced Science Trust',
+    'Regional Officer, AICTE (North)',
+    'Member Secretary, AICTE',
+    8.0,
+    0,
+    0,
+    'LIEN/AICTE/NWRO/2014/01',
+    'REGULATORY_SECURITY',
+    'RELEASED',
+    'VERIFIED',
+    '2014-03-05 10:00:00',
+    'usr_regional_north_01',
+    'Dr. K. N. Rao (Regional Officer)',
+    '2014-03-10 11:00:00',
+    'PORTAL_VERIFICATION',
+    'Deposit successfully released after completion of statutory tenure. Bank lien revoked.'
+  );
+
+  // Seed Linked Documents
+  const insertFdrDoc = db.prepare(`
+    INSERT OR REPLACE INTO fdr_documents (
+      id, fdr_id, institution_id, document_type, file_name,
+      stored_path, file_size, mime_type, file_hash_sha256,
+      version, verification_status, uploaded_by, uploaded_by_name, uploaded_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `);
+
+  insertFdrDoc.run(
+    'fdr_doc_001',
+    'fdr_delhi_001',
+    'inst_delhi_001',
+    'FDR_SCAN',
+    'SBI_Fixed_Deposit_Receipt_984210.pdf',
+    sampleFdrFilePath,
+    samplePdfContent.length,
+    'application/pdf',
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    1,
+    'VALID',
+    'usr_inst_admin_delhi',
+    'Dr. Arvind Verma'
+  );
+
+  insertFdrDoc.run(
+    'fdr_doc_002',
+    'fdr_delhi_001',
+    'inst_delhi_001',
+    'BANK_LIEN_LETTER',
+    'SBI_Lien_Marking_Letter_Official.pdf',
+    sampleFdrFilePath,
+    samplePdfContent.length,
+    'application/pdf',
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    1,
+    'VALID',
+    'usr_inst_admin_delhi',
+    'Dr. Arvind Verma'
+  );
+
+  insertFdrDoc.run(
+    'fdr_doc_003',
+    'fdr_delhi_004',
+    'inst_delhi_001',
+    'FDR_SCAN',
+    'HDFC_FDR_Receipt_338190.pdf',
+    sampleFdrFilePath,
+    samplePdfContent.length,
+    'application/pdf',
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    1,
+    'UNVERIFIED',
+    'usr_inst_admin_delhi',
+    'Dr. Arvind Verma'
+  );
+
+  // Seed Discrepancy on FDR 5
+  db.prepare(`
+    INSERT OR REPLACE INTO fdr_discrepancies (
+      id, fdr_id, institution_id, category, title, description,
+      severity, raised_by_id, raised_by_name, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', CURRENT_TIMESTAMP)
+  `).run(
+    'disc_mumbai_001',
+    'fdr_mumbai_001',
+    'inst_mumbai_002',
+    'MISSING_JOINT_HOLDER',
+    'Joint Holder Mandate Letter Missing Official Stamp',
+    'Bank lien letter lacks branch manager official rubber stamp and contact telephone.',
+    'HIGH',
+    'usr_regional_north_01',
+    'Dr. K. N. Rao (Regional Officer)'
+  );
+
+  // Seed Release Request on FDR 6
+  db.prepare(`
+    INSERT OR REPLACE INTO fdr_release_requests (
+      id, fdr_id, institution_id, request_number, reason,
+      requested_by_id, requested_by_name, status, review_notes, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, CURRENT_TIMESTAMP)
+  `).run(
+    'rel_mumbai_001',
+    'fdr_mumbai_002',
+    'inst_mumbai_002',
+    'REL-2026-MUM-019',
+    'TENURE_COMPLETED',
+    'usr_inst_admin_mumbai',
+    'Prof. Sunita Deshmukh',
+    'Institution has completed 10 continuous years of academic operation without adverse regulatory finding. Release of security deposit requested under AICTE Approval Process Handbook Clause 1.4.'
+  );
+
+  // Seed Reminder Rules
+  const insertRule = db.prepare(`
+    INSERT OR REPLACE INTO fdr_reminder_rules (id, name, trigger_event, days_threshold, recipient_role, is_enabled)
+    VALUES (?, ?, ?, ?, ?, 1)
+  `);
+  insertRule.run('rule_mat_30', '30-Day Maturity Pre-Notice', 'MATURITY_APPROACHING', 30, ROLES.INSTITUTION_ADMIN);
+  insertRule.run('rule_mat_15', '15-Day Urgent Maturity Notice', 'MATURITY_APPROACHING', 15, ROLES.INSTITUTION_ADMIN);
+  insertRule.run('rule_mat_0', 'Matured Instrument Overdue Alert', 'MATURED_OVERDUE', 0, ROLES.REGIONAL_OFFICER);
+  insertRule.run('rule_ver_7', 'Unverified FDR SLA Reminder', 'VERIFICATION_PENDING', 7, ROLES.REGIONAL_OFFICER);
+
+  console.log('AICTE Security Deposit & FDR environment successfully seeded.');
   console.log('AICTE Digital Governance environment seeded successfully with all statutory modules & telemetry.');
 }
 

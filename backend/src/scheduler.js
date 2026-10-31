@@ -139,6 +139,91 @@ function runScheduledChecks() {
       }
     }
 
+    // =========================================================================
+    // 5. AICTE SECURITY DEPOSIT & FDR PORTAL (PS-26265) MATURITY & ALERT SCAN
+    // =========================================================================
+    const today = new Date().toISOString().split('T')[0];
+
+    // A. Flag and notify Matured FDRs that are past maturity date
+    const overdueFdrs = db.prepare(`
+      SELECT f.*, i.name as institution_name
+      FROM fdr_records f
+      JOIN institutions i ON f.institution_id = i.id
+      WHERE f.maturity_date < ?
+        AND f.status IN ('ACTIVE', 'MATURING_SOON', 'PENDING_VERIFICATION')
+    `).all(today);
+
+    for (const fdr of overdueFdrs) {
+      db.prepare(`
+        UPDATE fdr_records SET status = 'MATURED', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+      `).run(fdr.id);
+
+      const alreadyAlerted = db.prepare(`
+        SELECT id FROM fdr_alerts_sent 
+        WHERE fdr_id = ? AND alert_type = 'MATURED_OVERDUE' AND date(sent_at) = date('now')
+      `).get(fdr.id);
+
+      if (!alreadyAlerted) {
+        db.prepare(`
+          INSERT INTO fdr_alerts_sent (id, fdr_id, alert_type) VALUES (?, ?, 'MATURED_OVERDUE')
+        `).run(uuidv4(), fdr.id);
+
+        createNotification({
+          institutionId: fdr.institution_id,
+          title: `URGENT: FDR No. ${fdr.fdr_number} Matured`,
+          message: `Security Deposit FDR No. ${fdr.fdr_number} (₹${Number(fdr.deposit_amount).toLocaleString('en-IN')}) matured on ${fdr.maturity_date}. Submit renewal or replacement immediately.`,
+          type: 'ERROR',
+          link: `/fdr/${fdr.id}`
+        });
+
+        createNotification({
+          roleTarget: ROLES.REGIONAL_OFFICER,
+          title: `Overdue Matured FDR: ${fdr.fdr_number}`,
+          message: `Institution ${fdr.institution_name} has an unrenewed matured FDR No. ${fdr.fdr_number} (₹${Number(fdr.deposit_amount).toLocaleString('en-IN')}).`,
+          type: 'WARNING',
+          link: `/fdr/${fdr.id}`
+        });
+
+        actionsTaken++;
+      }
+    }
+
+    // B. Flag and notify FDRs Maturing in <= 30 Days
+    const in30Days = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    const maturingSoonFdrs = db.prepare(`
+      SELECT f.*, i.name as institution_name
+      FROM fdr_records f
+      JOIN institutions i ON f.institution_id = i.id
+      WHERE f.maturity_date >= ? AND f.maturity_date <= ?
+        AND f.status = 'ACTIVE'
+    `).all(today, in30Days);
+
+    for (const fdr of maturingSoonFdrs) {
+      db.prepare(`
+        UPDATE fdr_records SET status = 'MATURING_SOON', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+      `).run(fdr.id);
+
+      const alreadyAlerted = db.prepare(`
+        SELECT id FROM fdr_alerts_sent 
+        WHERE fdr_id = ? AND alert_type = 'MATURING_30_DAYS' AND date(sent_at) = date('now')
+      `).get(fdr.id);
+
+      if (!alreadyAlerted) {
+        db.prepare(`
+          INSERT INTO fdr_alerts_sent (id, fdr_id, alert_type) VALUES (?, ?, 'MATURING_30_DAYS')
+        `).run(uuidv4(), fdr.id);
+
+        createNotification({
+          institutionId: fdr.institution_id,
+          title: `FDR Maturing Soon: ${fdr.fdr_number}`,
+          message: `Security Deposit FDR No. ${fdr.fdr_number} (₹${Number(fdr.deposit_amount).toLocaleString('en-IN')}) is maturing on ${fdr.maturity_date}. Prepare renewal or replacement documents.`,
+          type: 'WARNING',
+          link: `/fdr/${fdr.id}`
+        });
+        actionsTaken++;
+      }
+    }
+
     return { success: true, actionsTaken };
   } catch (err) {
     console.error('Scheduled compliance/escalation check failed:', err.message);

@@ -3,7 +3,8 @@ import {
   LayoutDashboard, Building2, FileSpreadsheet, GitMerge, CheckSquare,
   ClipboardCheck, Scale, Award, FileText, ShieldCheck, FolderLock,
   MessageSquareText, AlertTriangle, BarChart3, UserCheck, History,
-  ShieldAlert, ChevronLeft, ChevronRight, Sparkles, Bell
+  ShieldAlert, ChevronLeft, ChevronRight, Sparkles, Bell, Landmark,
+  Shield, RefreshCw, DollarSign
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -18,29 +19,21 @@ export default function Sidebar({
 }) {
   const navSections = [
     {
-      title: 'OVERVIEW',
+      title: 'FDR & SECURITY DEPOSIT LIFECYCLE',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'institution', label: 'Institution Profile', icon: Building2 }
+        { id: 'dashboard', label: 'FDR Dashboard', icon: LayoutDashboard },
+        { id: 'fdr-register', label: 'FDR Master Register', icon: Landmark },
+        { id: 'fdr-verification', label: 'Verification Workspace', icon: Shield },
+        { id: 'fdr-renewals', label: 'Renewal & Replacement', icon: RefreshCw },
+        { id: 'fdr-releases', label: 'Release & Refund Portal', icon: DollarSign },
+        { id: 'fdr-reports', label: 'Deposit Reports & Analytics', icon: BarChart3 }
       ]
     },
     {
-      title: 'STATUTORY APPROVALS',
+      title: 'DOCUMENT CUSTODY & GOVERNANCE',
       items: [
-        { id: 'applications', label: 'Applications', icon: FileSpreadsheet },
-        { id: 'workflow', label: 'Workflow Engine', icon: GitMerge },
-        { id: 'scrutiny', label: 'Scrutiny & Deficiencies', icon: CheckSquare },
-        { id: 'evc', label: 'EVC Inspections', icon: ClipboardCheck },
-        { id: 'sac', label: 'SAC Appellate Hearings', icon: Scale },
-        { id: 'decisions', label: 'Authority Decisions', icon: Award }
-      ]
-    },
-    {
-      title: 'COMPLIANCE & GOVERNANCE',
-      items: [
-        { id: 'undertakings', label: 'Undertakings & Affidavits', icon: FileText },
-        { id: 'compliance', label: 'Compliance Monitoring', icon: ShieldCheck },
         { id: 'documents', label: 'Document Repository', icon: FolderLock },
+        { id: 'institution', label: 'Institution Profile', icon: Building2 },
         { id: 'comments', label: 'Official Communications', icon: MessageSquareText },
         {
           id: 'escalations',
@@ -52,12 +45,19 @@ export default function Sidebar({
       ]
     },
     {
+      title: 'STATUTORY APPROVALS (APH)',
+      items: [
+        { id: 'applications', label: 'Approval Applications', icon: FileSpreadsheet },
+        { id: 'scrutiny', label: 'Scrutiny & Deficiencies', icon: CheckSquare },
+        { id: 'decisions', label: 'Authority Decisions', icon: Award }
+      ]
+    },
+    {
       title: 'ADMINISTRATION & SECURITY',
       items: [
-        { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
         { id: 'rbac', label: 'RBAC Policy Matrix', icon: UserCheck, adminOnly: true },
         { id: 'audit', label: 'SHA-256 Audit Trail', icon: History },
-        { id: 'security-tests', label: 'Security Tests (9/9)', icon: ShieldAlert }
+        { id: 'security-tests', label: 'Security & Lifecycle Tests', icon: ShieldAlert }
       ]
     }
   ];
@@ -98,40 +98,30 @@ export default function Sidebar({
                   {section.title}
                 </div>
               )}
-              {visibleItems.map(item => {
+
+              {visibleItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentTab === item.id;
+
                 return (
                   <button
                     key={item.id}
                     onClick={() => setCurrentTab(item.id)}
-                    title={collapsed ? item.label : undefined}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition cursor-pointer text-left relative ${
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
                       isActive
                         ? 'bg-[#12345A] text-white font-semibold shadow-xs'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-[#12345A]'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                     }`}
+                    title={collapsed ? item.label : undefined}
                   >
-                    {isActive && (
-                      <span className="absolute left-0 top-1 bottom-1 w-1 bg-[#F2A900] rounded-r-md" />
-                    )}
-                    <Icon
-                      className={`w-4 h-4 shrink-0 ${
-                        isActive ? 'text-[#F2A900]' : 'text-[#1B5E80]'
-                      }`}
-                    />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#F2A900]' : 'text-slate-500'}`} />
                     {!collapsed && (
-                      <span className="truncate flex-1">{item.label}</span>
+                      <span className="truncate flex-1 text-left">{item.label}</span>
                     )}
                     {!collapsed && item.badge && (
-                      <span
-                        className={`ml-auto text-[10px] font-bold px-1.5 py-0.2 rounded-full text-white ${item.badgeColor}`}
-                      >
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${item.badgeColor || 'bg-red-500'}`}>
                         {item.badge}
                       </span>
-                    )}
-                    {collapsed && item.badge && (
-                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
                     )}
                   </button>
                 );
@@ -141,18 +131,17 @@ export default function Sidebar({
         })}
       </div>
 
-      {/* Collapse Toggle Footer */}
-      <div className="p-2 border-t border-[#DCE3EA] flex items-center justify-between text-xs text-slate-500">
+      {/* Collapse/Expand Toggle Footer */}
+      <div className="p-3 border-t border-slate-100 flex items-center justify-between">
         {!collapsed && (
-          <div className="px-2 text-[11px] text-slate-400">
-            AICTE SIH v3.0
+          <div className="text-[10px] text-slate-400 font-mono">
+            PS #26265 • v4.0.0
           </div>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded hover:bg-slate-100 text-slate-600 transition ml-auto cursor-pointer"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer mx-auto"
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>

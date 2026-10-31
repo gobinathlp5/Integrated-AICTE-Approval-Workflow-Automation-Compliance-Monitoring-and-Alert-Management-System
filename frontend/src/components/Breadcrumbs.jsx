@@ -2,7 +2,12 @@ import React from 'react';
 import { ChevronRight, Home, Shield, Building, FileCheck } from 'lucide-react';
 
 const TAB_TITLES = {
-  dashboard: 'Executive Dashboard',
+  dashboard: 'Security Deposit & FDR Dashboard',
+  'fdr-register': 'FDR Master Register',
+  'fdr-verification': 'Officer Verification Workspace',
+  'fdr-renewals': 'Renewal & Replacement Management',
+  'fdr-releases': 'Release & Refund Portal',
+  'fdr-reports': 'FDR Analytics & Reports',
   institution: 'Institutional Profile & Accreditation',
   applications: 'Statutory Approval Applications',
   workflow: 'Approval Workflow Engine',

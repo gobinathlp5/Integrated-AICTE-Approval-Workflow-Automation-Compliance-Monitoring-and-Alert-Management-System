@@ -1,9 +1,10 @@
 # System Architecture & Technical Specifications
 
-**Project:** Integrated AICTE Approval Workflow Automation, Compliance Monitoring and Alert Management System  
-**Problem Statement ID:** 26262  
-**Organization:** All India Council for Technical Education (AICTE), Department: Regulation Bureau  
-**Theme:** Smart Automation  
+**Project:** AICTE Security Deposit & FDR Management Portal  
+**Problem Statement ID:** 26265  
+**Problem Statement Title:** Streamline of Security Deposit/FDR Portal  
+**Organization:** All India Council for Technical Education (AICTE), Department: Approval & Financial Regulation Bureau  
+**Theme:** Smart Automation / Financial Governance  
 
 ---
 
@@ -11,8 +12,8 @@
 
 ```
                                   ┌──────────────────────────────────────────────┐
-                                  │      Client Layer (Vite + React SPA)         │
-                                  │      AICTE Digital Governance Portal         │
+                                  │       Client Layer (Vite + React SPA)        │
+                                  │ AICTE Security Deposit & FDR Portal (26265)  │
                                   └──────────────────────┬───────────────────────┘
                                                          │ HTTPS / JSON / Multipart
                                                          ▼
@@ -24,18 +25,19 @@
                ┌─────────────────────────────────────────┼─────────────────────────────────────────┐
                ▼                                         ▼                                         ▼
 ┌──────────────────────────────┐          ┌──────────────────────────────┐          ┌──────────────────────────────┐
-│  Auth & Identity Engine      │          │   Workflow & State Machine   │          │  Document & File Vault       │
-│  - Fail-Secure Secret Engine │          │   - 12-Stage Enforced Graph  │          │  - Magic Byte Validation     │
-│  - Dynamic Bcrypt Salted OTP │          │   - Optimistic Concurrency   │          │  - Path Traversal Defense    │
-│  - RBAC & ABAC Enforcer      │          │   - Prerequisite Kernel      │          │  - HMAC Time-Limited Tokens  │
+│  Auth & Identity Engine      │          │   FDR Relational Lifecycle   │          │  Document & File Vault       │
+│  - Fail-Secure Secret Engine │          │   - Registration & Custody   │          │  - Magic Byte Validation     │
+│  - Dynamic Bcrypt Salted OTP │          │   - 2-Party Verification     │          │  - Path Traversal Defense    │
+│  - 13 RBAC Personas          │          │   - Discrepancy Adjudication │          │  - HMAC Time-Limited Tokens  │
+│  - Multi-Tenant Isolation    │          │   - Renewals & Releases      │          │  - Watermarked Inline Stream │
 └──────────────┬───────────────┘          └──────────────┬───────────────┘          └──────────────┬───────────────┘
                │                                         │                                         │
                └─────────────────────────────────────────┼─────────────────────────────────────────┘
                                                          │
                                                          ▼
                                   ┌──────────────────────────────────────────────┐
-                                  │        Background Automation Daemon          │
-                                  │        (Cron SLA & Escalation Engine)        │
+                                  │       Background Automation Daemon           │
+                                  │   (Maturity Scan: 30d / 15d / Overdue Alerts) │
                                   └──────────────────────┬───────────────────────┘
                                                          │
                                                          ▼
@@ -43,79 +45,78 @@
                                   │       Data Persistence & Audit Chain         │
                                   │   SQLite WAL Mode + Immutable Triggers       │
                                   │   SHA-256 Merkle-Style Cryptographic Ledger  │
-                                  │   Atomic Deterministic Order Sequences       │
+                                  │   Versioned Schema Migrations (v1 - v11)     │
                                   └──────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Multi-Tenant Isolation & Scope Boundaries
+## 2. Relational Database Schema (Version 11 Migration)
 
-Access control is enforced at three distinct hierarchical boundaries:
+The system introduces 8 dedicated relational tables in `backend/src/db.js`:
 
-1. **Role-Based Access Control (RBAC):**
-   - 13 distinct roles across Institutional, Regional, Bureau, Scrutiny, Expert Committee, Appellate, and Auditing tiers.
-   - Dynamic user-level permission overrides table (`user_permissions`).
+1. **`fdr_records`**:
+   - Master entity for every security deposit or bank guarantee.
+   - Key fields: `fdr_number` (UNIQUE), `institution_id`, `deposit_amount`, `currency`, `issue_date`, `maturity_date`, `issuing_bank`, `bank_branch`, `ifsc_code`, `joint_holder_name`, `beneficiary`, `lien_marked`, `purpose`, `status`, `verification_status`.
 
-2. **Tenant-Level Isolation (Multi-Tenancy):**
-   - Every institutional record (`applications`, `documents`, `undertakings`, `compliance_records`) strictly carries `institution_id`.
-   - The security middleware inspects authenticated `req.user.institution_id`. Any request by an institutional user for another institution's resource (including workflow history and decision dockets) is rejected with `HTTP 403 Forbidden`.
+2. **`fdr_documents`**:
+   - Physical document attachments (scans, bank confirmation letters, joint mandates).
+   - Key fields: `fdr_id`, `institution_id`, `document_type`, `stored_path`, `file_size`, `file_hash_sha256`, `verification_status`.
 
-3. **Regional Directorate Jurisdiction & Assignment-Based Attribute Control (ABAC):**
-   - Regional Officers are constrained strictly to applications and decisions within their assigned administrative region (`req.user.region`).
-   - Scrutiny Officers can only evaluate applications assigned to their evaluation docket (`assigned_scrutiny_officer_id`).
-   - EVC Committee Members can only view inspection files and submit reports for applications where their committee is assigned (`evc_committee_members`).
-   - CAG Statutory Auditors are strictly read-only and prohibited from executing mutations or workflow transitions.
+3. **`fdr_verifications`**:
+   - Formal officer verification audit trail.
+   - Key fields: `fdr_id`, `officer_id`, `officer_name`, `verification_method`, `bank_confirmation_ref`, `result`, `observations`.
 
----
+4. **`fdr_discrepancies`**:
+   - Bi-directional defect tracking for non-compliant instruments.
+   - Key fields: `fdr_id`, `institution_id`, `category`, `title`, `description`, `severity`, `status`, `institution_response`, `resolution_remarks`.
 
-## 3. Workflow State Machine & Concurrency Safeguards
+5. **`fdr_renewals`**:
+   - Renewal and instrument replacement requests.
+   - Key fields: `original_fdr_id`, `replacement_fdr_id`, `renewal_type` (`SAME_FDR_EXTENDED` vs `NEW_FDR_REPLACEMENT`), `status`, `reviewed_by_id`, `review_decision`.
 
-The workflow transition engine (`backend/src/routes/workflowRoutes.js`) enforces:
+6. **`fdr_release_requests`**:
+   - Statutory refund and release workflow.
+   - Key fields: `fdr_id`, `request_number`, `reason`, `status` (`REQUESTED`, `UNDER_SCRUTINY`, `CA_APPROVED`, `RELEASE_COMPLETED`), `decision`, `release_evidence_doc_id`.
 
-1. **Strict Transition Graph:** Only transitions defined in `VALID_TRANSITIONS` are permitted. Stage skipping (e.g. from `SUBMITTED` directly to `APPROVED`) is rejected with `HTTP 409 Conflict`.
-2. **Role Authorization Matrix:** Each target stage requires specific statutory authority. Final `APPROVED` and `REJECTED` states can only be executed by `COMPETENT_AUTHORITY`.
-3. **Optimistic Locking / Race Condition Prevention:** All stage transitions update atomically:
-   ```sql
-   UPDATE applications 
-   SET current_stage = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-   WHERE id = ? AND (current_stage = ? OR (current_stage IS NULL AND status = ?))
-   ```
-   If zero rows are modified due to a concurrent transition, the engine rejects with `HTTP 409 Conflict`.
-4. **Authorized Workflow History:** Access to workflow history is gated by institution match for applicants and regional/assignment checks for officers.
+7. **`fdr_reminder_rules`**:
+   - Automated threshold rules (30-day notice, 15-day notice, 0-day overdue alert).
 
----
-
-## 4. Decision Engine & Centralized Prerequisites
-
-The decision pipeline (`backend/src/routes/decisionRoutes.js`) enforces:
-
-1. **Role-Restricted Pending Docket:** Only authorized decision-making roles (`COMPETENT_AUTHORITY`, `REGULATION_BUREAU`, `BUREAU_OFFICER`, `REGIONAL_OFFICER`, `SUPER_ADMIN`) can access pending decision lists, with regional filtering applied.
-2. **Centralized Prerequisite Validation (`validateDecisionPrerequisites`):**
-   - Application stage eligibility (must have completed scrutiny).
-   - Duplicate decision prohibition (preventing re-deciding an already approved/rejected docket).
-   - Zero unresolved critical or major deficiencies.
-   - Verification of all uploaded statutory documents.
-   - Formal scrutiny and SAC recommendation checks.
-3. **Strict Decision Enums:** Permitted values restricted to `['APPROVED', 'REJECTED', 'RETURNED_WITH_CONDITIONS', 'REJECTED_WITH_APPEAL']`.
-4. **No Unsafe Default Values:** Mandates explicit `approvedIntake` (> 0) and `validityYears` (1–5) for approvals; mandates formal statutory `reasoning` for rejections.
-5. **Deterministic Order Number Allocation:** Atomic database sequences (`order_number_sequences`) generate sequential, collision-free order numbers formatted as `AICTE/ORDER/${YYYY}/${NNNNNN}`.
+8. **`fdr_alerts_sent`**:
+   - Deduplication ledger ensuring institutions and officers receive at most one reminder per calendar day.
 
 ---
 
-## 5. Fail-Secure Authentication & Cryptographic Keys
+## 3. Background Automation Daemon & Alert Engine
 
-1. **Mandatory Cryptographic Secrets:** Both `JWT_SECRET` and `DOC_TOKEN_SECRET` are required in all environments and must satisfy a minimum length of 32 characters. The service fails securely at startup if either key is missing or weak.
-2. **Dynamic Salted OTPs:** 6-digit cryptographic OTPs are salted with bcrypt, bounded by a 5-minute TTL, and protected by a 3-attempt lockout.
-3. **Environment Security:** All `.env` files are excluded via `.gitignore`, while `.env.example` provides safe placeholder documentation.
+The background scheduler (`backend/src/scheduler.js`) runs periodically (15-minute intervals) and performs:
+- **Overdue Matured FDRs:** Identifies active or pending deposits where `maturity_date < today`. Automatically transitions status to `MATURED` and dispatches high-priority notifications to Institution Admin and Regional Officer.
+- **Approaching Maturity (≤ 30 days & ≤ 15 days):** Identifies active deposits nearing maturity. Transitions status to `MATURING_SOON` and triggers proactive renewal reminders.
+- **Alert Deduplication:** Checks `fdr_alerts_sent` by `date(sent_at) = date('now')` to ensure no spamming or alert fatigue occurs.
 
 ---
 
-## 6. Tamper-Evident SHA-256 Audit Ledger
+## 4. Multi-Tenant Isolation & Role-Based Access Control
 
-Every document operation (upload, view, download, classification change, verification) generates an immutable ledger entry.
+1. **Institutional Tier (`INSTITUTION_ADMIN`, `INSTITUTION_STAFF`):**
+   - Strictly isolated to `fdr.institution_id === req.user.institution_id`.
+   - Cannot view or query deposits belonging to other institutions (`HTTP 403`).
+   - Authorized to register new FDRs, upload documents, respond to discrepancies, and file renewal/release requests.
 
-$$H_i = \text{SHA-256}(H_{i-1} \parallel \text{audit\_id} \parallel \text{action} \parallel \text{user\_id} \parallel \text{timestamp})$$
+2. **Council Officer Tier (`REGIONAL_OFFICER`, `BUREAU_OFFICER`, `AICTE_ADMIN`, `SUPER_ADMIN`):**
+   - Regional Officers are geographically scoped to their assigned administrative region (`i.region === req.user.region`).
+   - Authorized to access the Verification Workspace, record bank confirmation outcomes, raise discrepancies, resolve discrepancies, and review renewal requests.
 
-- **Immutability:** SQLite database triggers `trg_prevent_audit_update` and `trg_prevent_audit_delete` raise `ABORT` on any update or delete attempts.
-- **Verification:** Built-in cryptographic hash verification iterates the full ledger to ensure no records have been altered, injected, or removed out-of-order.
+3. **Competent Authority Tier (`COMPETENT_AUTHORITY`):**
+   - Exclusive statutory authority to review technical scrutiny recommendations and formally issue statutory Release & Refund Orders.
+
+4. **Auditor Tier (`AUDITOR`):**
+   - Strictly read-only access to FDR registers, verifications, discrepancies, and SHA-256 audit trails. All mutation actions are rejected.
+
+---
+
+## 5. Security Vault & Tamper-Evident Integrity
+
+- **Cryptographic Audit Chain:** Every action (registering, modifying, uploading, verifying, raising discrepancy, resolving, renewing, releasing) appends a tamper-evident record to `document_audit_trail` linked by SHA-256 cryptographic chain.
+- **Immutability Database Triggers:** SQLite triggers `prevent_audit_update` and `prevent_audit_delete` guarantee that records cannot be altered or removed after creation.
+- **HMAC-SHA256 Token Vault:** Physical files are stored outside web-accessible roots. All previews and downloads require authenticated session tokens or temporary HMAC-SHA256 signed access tokens with a 5-minute validity window.

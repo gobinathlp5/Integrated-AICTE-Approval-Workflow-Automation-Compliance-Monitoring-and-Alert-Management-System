@@ -260,7 +260,7 @@ async function runApiIntegrationTests() {
 
     // 6. Scrutiny: Evaluation creation, checklist item, deficiency raise & resolution
     {
-      const testApp = db.prepare('SELECT * FROM applications LIMIT 1').get();
+      const testApp = db.prepare('SELECT * FROM applications WHERE institution_id = ? LIMIT 1').get(instUser.institution_id);
       // Evaluation
       const evalRes = await fetch(`${baseUrl}/api/scrutiny/evaluations`, {
         method: 'POST',
